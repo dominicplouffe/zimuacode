@@ -17,7 +17,9 @@ def test_task_runs_and_streams_normalized_events(app_client: TestClient) -> None
     task_id = start(app_client, "Add notes")
     task = wait_for(app_client, task_id, "idle", "failed")
     assert task["status"] == "idle"
-    assert task["branch"].startswith("zimua/add-notes-")
+    # A local placeholder until publishing names it after the PR title.
+    assert task["branch"] == f"zimua/task-{task_id[:6]}"
+    assert task["branch_named"] is False
     assert task["cost_usd"] == pytest.approx(0.01)
     assert task["input_tokens"] == 150
 
@@ -190,11 +192,13 @@ def test_publish_pushes_branch_and_opens_pr(
         "created": True,
     }
     body = json.loads(route.calls.last.request.content)
-    assert body["head"] == task["branch"]
+    # Named from the PR title, not the task's placeholder.
+    task = app_client.get(f"/api/tasks/{task_id}").json()
+    assert task["branch"] == body["head"] == "zimua/add-notes"
     assert body["base"] == "main"
     # The branch landed on the remote with the agent's file.
-    assert _git(remote, "show", f"{task['branch']}:AGENT.md") == "Add notes\n"
-    log = _git(remote, "log", "-1", "--format=%an <%ae>|%s", task["branch"])
+    assert _git(remote, "show", "zimua/add-notes:AGENT.md") == "Add notes\n"
+    log = _git(remote, "log", "-1", "--format=%an <%ae>|%s", "zimua/add-notes")
     assert log == "Octo Cat <42+octo@users.noreply.github.com>|Add notes\n"
     # The workspace never stored the token.
     assert (

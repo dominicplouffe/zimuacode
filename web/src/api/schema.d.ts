@@ -1136,6 +1136,12 @@ export interface components {
             output_tokens: number;
             /** Pr Number */
             pr_number: number | null;
+            /** Previous Prs */
+            previous_prs: number[];
+            /** Round */
+            round: number;
+            /** Branch Named */
+            branch_named: boolean;
             /**
              * Created At
              * Format: date-time

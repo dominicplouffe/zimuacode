@@ -43,6 +43,47 @@ def slugify(text: str, limit: int = 32) -> str:
     return slug[:limit].rstrip("-") or "task"
 
 
+# Words that say how something was asked, not what changes: dropped from branch names.
+FILLER = set(
+    """
+    a an the i we you me us our my your it its this that these those there here
+    is are am was were be been do does did can could would should will shall may might must
+    please pls just also so then now really actually maybe kind sort of some any
+    need needs want wants like let lets make sure try help
+    to for in on at by with from into about as and or but if when how what why which
+    able going get got have has had
+    """.split()  # noqa: SIM905  (a word list reads better as text)
+)
+
+
+def branch_slug(text: str, max_words: int = 5, max_length: int = 40) -> str:
+    """A short branch name about the change: "Do we support themes in this code?" →
+    "support-themes-code". Falls back to "change" when nothing meaningful is left."""
+    words = [w for w in re.findall(r"[a-z0-9]+", text.lower().replace("'", "")) if w not in FILLER]
+    slug = ""
+    for word in words[:max_words]:
+        candidate = f"{slug}-{word}" if slug else word
+        if len(candidate) > max_length:
+            break
+        slug = candidate
+    return slug or "change"
+
+
+def unique_branch(slug: str, taken: set[str]) -> str:
+    """zimua/<slug>, or zimua/<slug>-2, -3… when the name is already used."""
+    name = f"zimua/{slug}"
+    n = 2
+    while name in taken:
+        name = f"zimua/{slug}-{n}"
+        n += 1
+    return name
+
+
+def placeholder_branch(task_id: str, round: int = 1) -> str:
+    # Local only: renamed after the PR title when the work is published.
+    return f"zimua/task-{task_id[:6]}" + (f"-r{round}" if round > 1 else "")
+
+
 def title_from_prompt(prompt: str) -> str:
     first = prompt.strip().splitlines()[0] if prompt.strip() else "Task"
     return first if len(first) <= 80 else first[:79] + "…"
@@ -174,7 +215,8 @@ class TaskManager:
             repo_owner=owner,
             repo_name=name,
             base_branch=base_branch,
-            branch=base_branch if pr_number else f"zimua/{slugify(prompt)}-{task_id[:6]}",
+            branch=base_branch if pr_number else placeholder_branch(task_id),
+            branch_named=pr_number is not None,
             pr_number=pr_number,
             # Claude Code accepts a preset session id, which makes resuming reliable.
             session_id=str(uuid.uuid4()) if provider == "claude-code" else None,
@@ -411,6 +453,60 @@ class TaskManager:
         # Running from this moment, so nobody sees a stale "idle" before the turn starts.
         self.update(task_id, status="running", status_detail=None)
         self._spawn(task_id, self._start_turn(task_id, text, names))
+
+    async def new_round(
+        self, task_id: str, merged_pr: int, after_sha: str, base: str, token: str
+    ) -> Task:
+        """Ends a round whose PR was merged: the workspace moves to a new branch from the
+        latest `base`, carrying over only work done after the merged PR's head."""
+        task = self.load(task_id)
+        repo = self.repo_dir(task_id)
+        await git.fetch_branch(repo, base, token)
+        # The PR may have gained commits from elsewhere before merging; fetch them so the
+        # "after" point exists here. Its branch may already be deleted, which is fine.
+        if await git.rev_parse(repo, after_sha) is None:
+            await git.fetch_branch(repo, task.branch, token)
+        if await git.rev_parse(repo, after_sha) is None:
+            after_sha = task.published_sha or after_sha
+        round = task.round + 1
+        new_branch = placeholder_branch(task_id, round)
+        await git.start_round(repo, f"origin/{base}", after_sha, new_branch)
+        new_base = await git.rev_parse(repo, f"origin/{base}")
+        task = self.update(
+            task_id,
+            branch=new_branch,
+            branch_named=False,
+            base_branch=base,
+            base_sha=new_base,
+            pr_number=None,
+            previous_prs=[*(task.previous_prs or []), merged_pr],
+            round=round,
+        )
+        self.bus.publish(task_id, "round", {"previous_pr": merged_pr, "base": base, "round": round})
+        return task
+
+    def retire_pr(self, task_id: str) -> Task:
+        """The PR was closed without merging: keep the branch, open a new PR next time."""
+        task = self.load(task_id)
+        if task.pr_number is None:
+            return task
+        return self.update(
+            task_id,
+            pr_number=None,
+            previous_prs=[*(task.previous_prs or []), task.pr_number],
+        )
+
+    async def name_branch(self, task_id: str, title: str, token: str) -> Task:
+        """Gives a placeholder branch its real name, from the PR title, before the first push."""
+        task = self.load(task_id)
+        if task.branch_named:
+            return task
+        repo = self.repo_dir(task_id)
+        slug = branch_slug(title)
+        taken = await git.remote_branches(repo, f"zimua/{slug}", token)
+        name = unique_branch(slug, taken)
+        await git.rename_branch(repo, name)
+        return self.update(task_id, branch=name, branch_named=True)
 
     async def interrupt(self, task_id: str) -> None:
         task = self.load(task_id)

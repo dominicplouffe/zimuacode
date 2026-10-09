@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
 from datetime import datetime
 from typing import Annotated, Any, Literal
@@ -11,6 +12,7 @@ from sqlmodel import col, select
 
 from app.api.common import gh_call
 from app.deps import DbDep, GitHubDep, UserDep
+from app.github.client import GitHub
 from app.models import ProviderCredential, Task, User
 from app.preview import preview_link
 from app.security import decrypt, encrypt
@@ -19,6 +21,7 @@ from app.tasks.manager import TaskError, TaskManager, queued_message
 from app.tasks.providers import PROVIDERS, ProviderInfo
 
 router = APIRouter(prefix="/api", tags=["tasks"])
+log = logging.getLogger(__name__)
 
 SSE_PING_SECONDS = 15
 
@@ -55,6 +58,11 @@ class TaskSummary(BaseModel):
     input_tokens: int
     output_tokens: int
     pr_number: int | None
+    # PRs from earlier rounds of this task (merged, or closed).
+    previous_prs: list[int]
+    round: int
+    # False while the branch is a local placeholder, named from the PR title on publish.
+    branch_named: bool
     created_at: datetime
     updated_at: datetime
 
@@ -112,8 +120,38 @@ class PublishResult(BaseModel):
 
 
 def _summary(task: Task) -> TaskSummary:
-    fields = task.model_dump(include=set(TaskSummary.model_fields) - {"pending"})
-    return TaskSummary(**fields, pending=[queued_message(item)[0] for item in task.pending])
+    fields = task.model_dump(include=set(TaskSummary.model_fields) - {"pending", "previous_prs"})
+    return TaskSummary(
+        **fields,
+        pending=[queued_message(item)[0] for item in task.pending],
+        previous_prs=task.previous_prs or [],
+    )
+
+
+async def _sync_pr(task: Task, manager: TaskManager, gh: GitHub, token: str) -> Task:
+    """Catches up with what happened to the task's PR on GitHub.
+
+    Merged: the round is over, so the workspace moves to a new branch from the latest base
+    and the next publish opens a new PR. Closed without merging: the next publish opens a
+    new PR from the same branch. Open: nothing to do.
+    """
+    if task.pr_number is None:
+        return task
+    pull = await gh_call(gh.pull(task.repo_owner, task.repo_name, task.pr_number))
+    if pull.get("merged") or pull.get("merged_at"):
+        try:
+            return await manager.new_round(
+                task.id, task.pr_number, pull["head"]["sha"], pull["base"]["ref"], token
+            )
+        except git.GitError as e:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT,
+                f"PR #{task.pr_number} was merged, and {e}. Ask the agent to rebase onto "
+                f"{pull['base']['ref']} and resolve them, then try again.",
+            ) from e
+    if pull.get("state") == "closed":
+        return manager.retire_pr(task.id)
+    return task
 
 
 def _own_task(manager: TaskManager, task_id: str, user: User) -> Task:
@@ -273,9 +311,19 @@ async def task_events(
 
 @router.post("/tasks/{task_id}/messages", status_code=status.HTTP_202_ACCEPTED)
 async def send_message(
-    task_id: str, body: Message, user: UserDep, manager: ManagerDep
+    task_id: str, body: Message, user: UserDep, manager: ManagerDep, gh: GitHubDep
 ) -> TaskSummary:
-    _own_task(manager, task_id, user)
+    task = _own_task(manager, task_id, user)
+    if task.pr_number is not None and task.status not in ("preparing", "running", "stopped"):
+        # A follow-up after the PR was merged starts the next round on the latest base,
+        # so the agent builds on what's in main now. GitHub being unreachable mustn't block
+        # the chat; publishing checks again.
+        try:
+            await _sync_pr(task, manager, gh, decrypt(user.token_enc))
+        except HTTPException as e:
+            if e.status_code == status.HTTP_409_CONFLICT:
+                raise
+            log.warning("checking PR #%s for task %s failed: %s", task.pr_number, task_id, e.detail)
     images = _decode_images(body.images)
     try:
         manager.send(task_id, body.text, images)
@@ -377,7 +425,11 @@ async def publish_task(
     if task.status in ("preparing", "running"):
         raise HTTPException(status.HTTP_409_CONFLICT, "Wait for the agent to finish first")
     repo = _workspace(manager, task)
+    token = decrypt(user.token_enc)
+    # Never push to a merged PR's branch: start a new round (and later a new PR) instead.
+    task = await _sync_pr(task, manager, gh, token)
     try:
+        task = await manager.name_branch(task_id, body.title, token)
         await git.commit_all(
             repo,
             body.title,
@@ -386,7 +438,8 @@ async def publish_task(
         )
         if await git.ahead_of(repo, task.base_sha or "") == 0:
             raise HTTPException(status.HTTP_409_CONFLICT, "There are no changes to publish")
-        await git.push(repo, task.branch, decrypt(user.token_enc))
+        await git.push(repo, task.branch, token)
+        manager.update(task_id, published_sha=await git.rev_parse(repo, "HEAD"))
     except git.GitError as e:
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"git: {e}") from e
 

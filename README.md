@@ -82,10 +82,12 @@ You can also save `{"serverUrl": "https://ide.example.com"}` to `config.json` in
 
 Open **Agent Tasks** in the activity bar (or "Agent: New Task…" in the command palette), describe the work and start. Each task:
 
-- clones the repo into its own workspace on the server, on a new branch `zimua/<summary>-<id>`;
+- clones the repo into its own workspace on the server;
 - runs the agent CLI there, streaming its transcript (messages, tool calls, results, cost) to the IDE live;
 - takes follow-ups (queued if the agent is still working) and can be interrupted;
-- shows its changed files with live diffs, and publishes them as a pull request (or pushes to its existing one).
+- shows its changed files with live diffs, and publishes them as a pull request (or pushes to its existing one). The branch is named from the PR title, without filler words: "Support pasting images" becomes `zimua/support-pasting-images` (`-2`, `-3`… if taken).
+
+A task outlives its pull request. Once the PR is merged, the next follow-up moves the workspace to a new branch from the latest base, so the agent builds on what's in `main` now, and the next publish opens a new PR. The conversation carries on unchanged. If the PR was closed without merging, the next publish opens a new PR from the same branch. If newer work conflicts with the new base, nothing moves and you're told which files conflict.
 
 Turns run detached from the server and write to a log on disk, so a task keeps going when you close the browser, and the server picks it back up after a restart.
 

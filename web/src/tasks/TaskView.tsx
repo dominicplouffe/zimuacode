@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -109,6 +109,13 @@ function EventView({ event, taskId }: { event: TaskEvent; taskId: string }) {
       )
     case 'link':
       return null
+    case 'round':
+      return (
+        <div className="msg-round" role="separator">
+          PR #{String(event.data.previous_pr)} was merged. Continuing on a new branch from the latest{' '}
+          {String(event.data.base)}.
+        </div>
+      )
     case 'pr':
       return (
         <div className="msg-status">
@@ -207,10 +214,32 @@ function Composer({ task }: { task: TaskSummary }) {
   )
 }
 
+/** The current PR's state on GitHub, to notice when it's been merged or closed. */
+function useTaskPull(task: TaskSummary) {
+  return useQuery({
+    // Same key as usePull, so merging from the PR tab updates this too.
+    queryKey: ['pull', task.repo_owner, task.repo_name, task.pr_number],
+    queryFn: () => api.pull(task.repo_owner, task.repo_name, task.pr_number!),
+    enabled: task.pr_number !== null,
+  })
+}
+
+function PullLink({ number, label }: { number: number; label?: string }) {
+  const openTab = useWorkbench((s) => s.openTab)
+  return (
+    <button className="link-button" onClick={() => openTab({ id: `pr:${number}`, kind: 'pr', number })}>
+      {label ?? `PR #${number}`}
+    </button>
+  )
+}
+
 function Publish({ task }: { task: TaskSummary }) {
   const queryClient = useQueryClient()
   const openTab = useWorkbench((s) => s.openTab)
-  const [title, setTitle] = useState(task.title)
+  const pull = useTaskPull(task)
+  // A merged or closed PR ends the round: the next publish opens a new PR.
+  const ended = pull.data && pull.data.state !== 'open' ? pull.data : null
+  const [title, setTitle] = useState(task.round > 1 || task.pr_number ? '' : task.title)
   const [draft, setDraft] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -222,7 +251,9 @@ function Publish({ task }: { task: TaskSummary }) {
     try {
       const result = await api.publishTask(task.id, { title: title.trim(), body: '', draft })
       queryClient.invalidateQueries({ queryKey: ['pulls'] })
+      queryClient.invalidateQueries({ queryKey: ['pull'] })
       queryClient.invalidateQueries({ queryKey: ['task', task.id] })
+      queryClient.invalidateQueries({ queryKey: ['taskChanges', task.id] })
       if (result.created) openTab({ id: `pr:${result.pr_number}`, kind: 'pr', number: result.pr_number })
       else useWorkbench.getState().notify(`Pushed to PR #${result.pr_number}`)
     } catch (e) {
@@ -234,18 +265,42 @@ function Publish({ task }: { task: TaskSummary }) {
 
   return (
     <div className="task-publish">
-      {task.pr_number ? (
+      {task.previous_prs.length > 0 && (
+        <div className="muted">
+          Earlier:{' '}
+          {task.previous_prs.map((n, i) => (
+            <span key={n}>
+              {i > 0 && ', '}
+              <PullLink number={n} />
+            </span>
+          ))}
+        </div>
+      )}
+      {task.pr_number && !ended ? (
         <>
-          <button className="link-button" onClick={() => openTab({ id: `pr:${task.pr_number}`, kind: 'pr', number: task.pr_number! })}>
-            View PR #{task.pr_number}
-          </button>
+          <PullLink number={task.pr_number} label={`View PR #${task.pr_number}`} />
           <button className="button full" disabled={busy || working} onClick={publish}>
             {busy ? 'Pushing…' : 'Push changes to PR'}
           </button>
         </>
       ) : (
         <>
-          <input className="input" aria-label="Pull request title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          {ended && (
+            <div className="muted">
+              <PullLink number={ended.number} /> was {ended.merged ? 'merged' : 'closed'}. New changes go to a new pull
+              request{ended.merged ? `, on a fresh branch from ${ended.base_ref}` : ''}.
+            </div>
+          )}
+          <input
+            className="input"
+            aria-label="Pull request title"
+            placeholder="What does this change do?"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          {!task.branch_named || ended?.merged ? (
+            <div className="muted">The branch is named after this title.</div>
+          ) : null}
           <label className="checkbox">
             <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} />
             Draft
@@ -338,7 +393,8 @@ function SidePanel({ task }: { task: TaskSummary }) {
           <div className="sidebar-section-header">
             <span>Pull request</span>
           </div>
-          <Publish task={task} />
+          {/* Remounted per round, so the title field starts fresh. */}
+          <Publish key={`${task.round}:${task.pr_number}`} task={task} />
           {task.status !== 'preparing' && (
             <>
               <div className="sidebar-section-header">
@@ -386,7 +442,8 @@ export function TaskView({ taskId }: { taskId: string }) {
               {t.model ? ` · ${t.model}` : ''}
             </span>
             <span>
-              <code>{t.branch}</code> from <code>{t.base_branch}</code>
+              {t.branch_named ? <code>{t.branch}</code> : <span title={t.branch}>new branch</span>} from{' '}
+              <code>{t.base_branch}</code>
             </span>
             <span className="muted">{formatCost(t)}</span>
             {t.status !== 'stopped' && t.status !== 'preparing' && (

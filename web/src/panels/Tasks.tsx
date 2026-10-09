@@ -53,7 +53,7 @@ export function Tasks() {
               <span className="list-detail">
                 {STATUS_LABEL[t.status] ?? t.status}
                 {allRepos ? ` · ${t.repo_name}` : ''} · {t.provider}
-                {t.pr_number ? ` · PR #${t.pr_number}` : ''}
+                {[...t.previous_prs, ...(t.pr_number ? [t.pr_number] : [])].map((n) => ` · PR #${n}`).join('')}
               </span>
             </span>
           </li>
