@@ -123,3 +123,39 @@ test('Codex and Codex Cloud share one login', async ({ page }) => {
   await expect(codex.getByRole('heading')).toContainText('Codex · Codex Cloud (hand-off)')
   await expect(codex.getByText('experimental')).toBeVisible()
 })
+
+test('after its PR is merged, a task continues on a new branch and a new PR', async ({ page }) => {
+  await openShop(page)
+  await startTask(page, 'I need to add release notes')
+  const transcript = page.locator('.transcript')
+  await expect(page.locator('.task-status')).toHaveText('Waiting for you')
+  // Until published, the branch is a placeholder named from the PR title later.
+  await expect(page.locator('.task-header')).toContainText('new branch from main')
+
+  await page.getByLabel('Pull request title').fill('Add release notes')
+  await expect(page.getByText('The branch is named after this title.')).toBeVisible()
+  await page.getByRole('button', { name: 'Create pull request' }).click()
+  await expect(page.getByRole('heading', { name: /Add release notes #2/ })).toBeVisible()
+  await expect(page.locator('.pr-meta')).toContainText('zimua/add-release-notes')
+
+  await page.getByRole('button', { name: 'Merge pull request' }).click()
+  await page.getByRole('button', { name: 'Confirm merge into main' }).click()
+  await expect(page.locator('.pr-state')).toHaveText('Merged')
+
+  await page.getByRole('tab', { name: /I need to add release notes/ }).click()
+  await expect(page.getByText(/was merged\. New changes go to a new pull request/)).toBeVisible()
+  await page.getByLabel('Message the agent').fill('Also mention the fix')
+  await page.getByRole('button', { name: 'Send' }).click()
+  await expect(transcript.getByText('PR #2 was merged. Continuing on a new branch from the latest main.')).toBeVisible()
+  await expect(transcript.getByText('Resumed: Also mention the fix')).toBeVisible()
+  await expect(page.locator('.task-status')).toHaveText('Waiting for you')
+
+  await page.getByLabel('Pull request title').fill('Mention the fix in the notes')
+  await page.getByRole('button', { name: 'Create pull request' }).click()
+  await expect(page.getByRole('heading', { name: /Mention the fix in the notes #3/ })).toBeVisible()
+  await expect(page.locator('.pr-meta')).toContainText('zimua/mention-fix-notes')
+
+  await page.getByRole('tab', { name: /I need to add release notes/ }).click()
+  await expect(page.locator('.task-publish').getByText('Earlier:')).toContainText('PR #2')
+  await expect(page.getByRole('button', { name: 'Push changes to PR' })).toBeVisible()
+})

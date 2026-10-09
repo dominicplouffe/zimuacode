@@ -39,7 +39,7 @@ export function useTaskEvents(taskId: string): { events: TaskEvent[]; connected:
         console.log('[task-debug] SSE', event.seq, event.type, JSON.stringify(event.data))
       setEvents((prev) => (prev.length && prev[prev.length - 1].seq >= event.seq ? prev : [...prev, event]))
       // Status changes and finished tool calls can change the task and its files.
-      if (['status', 'tool_result', 'command', 'file_change', 'usage', 'pr', 'user_message'].includes(event.type))
+      if (['status', 'tool_result', 'command', 'file_change', 'usage', 'pr', 'round', 'user_message'].includes(event.type))
         refresh()
     }
     return () => {

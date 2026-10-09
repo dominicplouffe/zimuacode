@@ -72,7 +72,15 @@ class Task(SQLModel, table=True):
     cost_usd: float = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    # This round's PR. A round ends when its PR is merged; the task then continues on a new
+    # branch from the latest base, and the old PR moves to previous_prs.
     pr_number: int | None = None
+    previous_prs: list[int] = Field(default_factory=list, sa_column=Column(JSON, default=list))
+    round: int = 1
+    # False while `branch` is a placeholder: it's named after the PR title when published.
+    branch_named: bool = True
+    # What was last pushed, to find newer work after a merge.
+    published_sha: str | None = None
     created_at: datetime = Field(default_factory=_now)
     updated_at: datetime = Field(default_factory=_now)
 

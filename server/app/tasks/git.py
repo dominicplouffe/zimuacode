@@ -118,3 +118,66 @@ async def push(repo: Path, branch: str, token: str | None) -> None:
 async def ahead_of(repo: Path, base_sha: str) -> int:
     """How many commits HEAD has on top of the base."""
     return int((await git(repo, "rev-list", "--count", f"{base_sha}..HEAD")).strip() or 0)
+
+
+async def fetch_branch(repo: Path, branch: str, token: str | None) -> bool:
+    """Updates origin/<branch>. False when the branch doesn't exist on the remote."""
+    try:
+        await git(
+            repo, "fetch", "--quiet", "origin",
+            f"+refs/heads/{branch}:refs/remotes/origin/{branch}", token=token,
+        )  # fmt: skip
+    except GitError:
+        return False
+    return True
+
+
+async def rev_parse(repo: Path, ref: str) -> str | None:
+    out = await git(repo, "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", check=False)
+    return out.strip() or None
+
+
+async def current_branch(repo: Path) -> str:
+    return (await git(repo, "rev-parse", "--abbrev-ref", "HEAD")).strip()
+
+
+async def remote_branches(repo: Path, prefix: str, token: str | None) -> set[str]:
+    """Branch names on the remote starting with prefix."""
+    out = await git(repo, "ls-remote", "--heads", "origin", f"refs/heads/{prefix}*", token=token)
+    return {line.split("refs/heads/", 1)[1] for line in out.splitlines() if "refs/heads/" in line}
+
+
+async def rename_branch(repo: Path, new: str) -> None:
+    await git(repo, "branch", "--move", new)
+
+
+async def start_round(repo: Path, onto: str, after: str, new_branch: str) -> None:
+    """Moves the work done since `after` onto `onto` (e.g. origin/main) as `new_branch`.
+
+    Used once a PR has been merged: its commits are in the base now (possibly squashed),
+    so only what came after its head is replayed. Uncommitted changes come along as a
+    commit. On a conflict nothing changes, and GitError names the conflicting files.
+    """
+    identity = ("-c", "user.name=Zimua", "-c", "user.email=zimua@localhost")
+    old = await current_branch(repo)
+    await git(repo, "add", "--all")
+    wip = bool((await git(repo, "status", "--porcelain")).strip())
+    if wip:
+        await git(repo, *identity, "commit", "--quiet", "-m", "Work in progress")
+    await git(repo, "checkout", "--quiet", "-b", new_branch)
+    try:
+        await git(repo, *identity, "rebase", "--quiet", "--onto", onto, after)
+    except GitError as e:
+        conflicts = (await git(repo, "diff", "--name-only", "--diff-filter=U", check=False)).split()
+        await git(repo, "rebase", "--abort", check=False)
+        await git(repo, "checkout", "--quiet", old, check=False)
+        await git(repo, "branch", "-D", new_branch, check=False)
+        if wip:
+            # Back to exactly where we were: the changes uncommitted again.
+            await git(repo, "reset", "--quiet", "HEAD~1", check=False)
+        if conflicts:
+            raise GitError(
+                f"your newer changes conflict with {onto.removeprefix('origin/')} in "
+                + ", ".join(conflicts)
+            ) from e
+        raise
