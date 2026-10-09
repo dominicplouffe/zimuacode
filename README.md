@@ -2,7 +2,7 @@
 
 A web IDE, similar to VS Code, for working with Claude Code and Codex on your GitHub repos. It runs in the browser or as an Electron app, both talking to one server you host.
 
-**Status:** Phases 1–4 of 5 (see [Roadmap](#roadmap)). You can sign in with GitHub, browse any repo and branch, edit and commit files, review and merge pull requests, read CI logs, change settings and themes, and run Claude Code or Codex tasks on your server that keep going with your laptop off (or hand them off to the vendors' clouds).
+**Status:** all 5 roadmap phases are built (see [Roadmap](#roadmap)). You can sign in with GitHub, browse any repo and branch, edit and commit files, review and merge pull requests, read CI logs, change settings and themes, and run Claude Code or Codex tasks on your server that keep going with your laptop off (or hand them off to the vendors' clouds).
 
 ## How it fits together
 
@@ -66,7 +66,7 @@ To run all of these in GitHub Actions, copy `deploy/github-ci.yml` to `.github/w
    sudo mkdir -p /srv/zimua && sudo chown 1000:1000 /srv/zimua
    docker compose up -d --build
    ```
-   This also builds `zimua-runner:latest`, the image agent tasks run in.
+   This also builds `zimua-runner:latest`, the image agent tasks run in. Point both `ZIMUA_DOMAIN` and `ZIMUA_PREVIEW_DOMAIN` at the VM.
 
 ## Desktop app
 
@@ -106,6 +106,22 @@ The hand-off agents exist because neither vendor has a public API for its cloud 
 - `docker` (the Compose default): one container per task from `runner-image/`, as a non-root user. The agent runs with permission prompts off, because the container is the boundary. Your GitHub token never enters the container; the server does the git clone and push itself.
 - `local` (the development default): the agent runs as a plain process on the server machine with permission prompts off. Use it only on a machine dedicated to this.
 
+### In each task
+
+- **Terminal** (button in the task header, or Ctrl+\`): a shell in the task's workspace. It keeps running on the server when you hide the panel or close the browser, and replays its recent output when you come back.
+- **Preview**: start a dev server in the terminal bound to `0.0.0.0` (`npm run dev -- -H 0.0.0.0` for Next.js, `npm run dev -- --host` for Vite, `uv run uvicorn app:app --host 0.0.0.0`), enter its port and open it. Previews are served from their own origin (`ZIMUA_PREVIEW_URL`), proxied to the workspace, hot reload included.
+- **Fix with agent**: on a PR's failing GitHub Actions check, starts a task on the PR's own branch with the end of the failing log in the prompt; publishing pushes straight to that PR.
+
+### Per-repository agent settings
+
+"Agent: Repository Settings" holds environment variables (encrypted, write-only) and a setup script that runs after each clone, before the agent starts (`npm ci`, `uv sync`...). Variables reach the setup script, the agent and the terminal.
+
+### Notifications
+
+In "Agent: Accounts", enable notifications on each browser you use. You get a push notification when an agent finishes or fails, and when CI fails on a PR an agent pushed to (watched for 2 hours after each push). Clicking one opens the task or PR. Turn them off everywhere with `notifications.enabled`. The Electron app can't receive Web Push.
+
+"Agent: Usage" totals tasks, tokens and reported cost per agent and per repository.
+
 ## Settings
 
 Open them with **⌘,** (Ctrl+, on Windows and Linux), the gear icon, or "Preferences: Open Settings (JSON)". The file is validated against `shared/settings.schema.json`, and any key you leave out uses its default.
@@ -134,6 +150,7 @@ To add a theme, drop a VS Code color theme JSON into `shared/themes/`.
 | ⌘B | Toggle sidebar |
 | ⌘, | Settings |
 | ⌘S | Save (settings editor) |
+| Ctrl+\` | Toggle the task terminal |
 
 ## Roadmap
 
@@ -141,6 +158,6 @@ To add a theme, drop a VS Code color theme JSON into `shared/themes/`.
 2. **Git** ✅: branches (switch, create, delete), editing with a per-branch working copy, atomic commits (to the branch or a new one), PR list and PR view (description, checks, files and diffs, conversation, comments, merge), CI logs, PR and CI status in the status bar.
 3. **Agent runner and Claude Code** ✅: per-task workspaces and containers running `claude -p --output-format stream-json` with your subscription token, a live transcript, queued follow-ups, interrupt, changed files with live diffs, publish to a PR, recovery after server restarts.
 4. **Codex and cloud hand-off** ✅: Codex (`codex exec --json`, resumable) in the runner; experimental hand-off to Claude Code on the web (`claude --cloud`) and Codex Cloud (`codex cloud exec`, with the result fetched into the workspace).
-5. **Extras**: push notifications, preview URLs for dev servers, a terminal, per-repo secrets and setup scripts, a usage view, and "Fix CI".
+5. **Extras** ✅: push notifications (task finished or failed, CI failed), app previews on a separate origin, a persistent terminal per task, per-repo env vars and setup script, usage view, "Fix with agent" for failing checks.
 
 > Running the official CLIs with your own subscription is meant for your personal use. Anthropic doesn't allow third-party products to offer claude.ai login, so don't run this as a service for other people.

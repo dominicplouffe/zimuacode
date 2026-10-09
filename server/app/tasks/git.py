@@ -61,12 +61,14 @@ async def git(
 
 
 async def clone(url: str, dest: Path, base: str, branch: str, token: str | None) -> str:
-    """Clones `base` into dest, creates `branch` from it, returns the base commit SHA."""
+    """Clones `base` into dest and returns its commit SHA. Work happens on a new `branch`
+    from it, or on `base` itself when they're the same (e.g. fixing a PR's branch)."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     await git(
         dest.parent, "clone", "--filter=blob:none", "--branch", base, url, dest.name, token=token
     )
-    await git(dest, "checkout", "-b", branch)
+    if branch != base:
+        await git(dest, "checkout", "-b", branch)
     return (await git(dest, "rev-parse", "HEAD")).strip()
 
 

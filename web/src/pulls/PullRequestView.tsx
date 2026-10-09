@@ -2,7 +2,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { api, type MergeMethod, type Pull, type PullFile } from '../api/client'
+import { api, type Check, type MergeMethod, type Pull, type PullFile } from '../api/client'
+import { cleanLog } from '../editor/cleanLog'
 import { useChecks, usePull, usePullFiles, usePullTimeline } from '../api/hooks'
 import { useWorkbench } from '../state/store'
 import { ChecksList } from './Checks'
@@ -195,6 +196,25 @@ function Conversation({ pull }: { pull: Pull }) {
   )
 }
 
+/** Opens the new-task form, prefilled to fix a failing check on the PR's own branch. */
+async function fixWithAgent(pull: Pull, check: Check) {
+  const s = useWorkbench.getState()
+  let tail = ''
+  try {
+    const log = cleanLog(await api.checkLogs(s.repo!.owner, s.repo!.name, check.id))
+    tail = log.trimEnd().split('\n').slice(-120).join('\n')
+  } catch {
+    // Without the log the agent can still run the checks itself.
+  }
+  const prompt =
+    `The CI check "${check.name}" is failing on pull request #${pull.number} (${pull.title}). ` +
+    'Find the cause and fix it, then run the relevant checks to confirm.' +
+    (tail ? `\n\nEnd of the failing log:\n\`\`\`\n${tail}\n\`\`\`` : '')
+  useWorkbench.setState({ newTaskDraft: { prompt, baseBranch: pull.head_ref, prNumber: pull.number } })
+  s.closeTab('newTask')
+  s.openTab({ id: 'newTask', kind: 'newTask' })
+}
+
 export function PullRequestView({ number }: { number: number }) {
   const { repo, setRef } = useWorkbench()
   const pull = usePull(repo, number)
@@ -241,7 +261,9 @@ export function PullRequestView({ number }: { number: number }) {
         <h2>Checks</h2>
         {checks.isLoading && <p className="muted">Loading…</p>}
         {checks.error && <p className="error">{checks.error.message}</p>}
-        {checks.data && <ChecksList checks={checks.data} />}
+        {checks.data && (
+          <ChecksList checks={checks.data} onFix={p.state === 'open' && sameRepo ? (c) => fixWithAgent(p, c) : undefined} />
+        )}
       </section>
 
       <MergeBox pull={p} />

@@ -11,7 +11,7 @@ export default defineConfig({
   server: {
     port: 5173,
     // Same origin as the API in development, so the session cookie just works.
-    proxy: { '/api': { target: server, changeOrigin: false } },
+    proxy: { '/api': { target: server, changeOrigin: false, ws: true } },
   },
   test: {
     environment: 'jsdom',

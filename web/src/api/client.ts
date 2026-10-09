@@ -23,6 +23,8 @@ export type TaskChange = Schemas['TaskChange']
 export type TaskFile = Schemas['TaskFile']
 export type PublishResult = Schemas['PublishResult']
 export type NewTask = Schemas['NewTask']
+export type AgentConfig = Schemas['AgentConfig']
+export type Usage = Schemas['Usage']
 
 /** One transcript event, as streamed from /api/tasks/{id}/events. */
 export interface TaskEvent {
@@ -141,6 +143,17 @@ export const api = {
     request<TaskFile>('GET', `/api/tasks/${id}/file?path=${encodeURIComponent(path)}&side=${side}`),
   publishTask: (id: string, body: { title: string; body: string; draft: boolean }) =>
     request<PublishResult>('POST', `/api/tasks/${id}/publish`, body),
+  agentConfig: (owner: string, name: string) => request<AgentConfig>('GET', `${repoPath(owner, name)}/agent-config`),
+  saveAgentConfig: (owner: string, name: string, body: { env?: Record<string, string | null>; setup_script?: string }) =>
+    request<AgentConfig>('PUT', `${repoPath(owner, name)}/agent-config`, body),
+  usage: () => request<Usage>('GET', '/api/usage'),
+  preview: (id: string, port: number) => request<{ url: string }>('POST', `/api/tasks/${id}/preview`, { port }),
+  closeTerminal: (id: string) => request<void>('DELETE', `/api/tasks/${id}/terminal`),
+  pushKey: () => request<{ public_key: string }>('GET', '/api/push/key'),
+  subscribePush: (subscription: PushSubscriptionJSON) => request<void>('POST', '/api/push/subscriptions', subscription),
+  unsubscribePush: (endpoint: string) =>
+    request<void>('DELETE', `/api/push/subscriptions?endpoint=${encodeURIComponent(endpoint)}`),
+  testPush: () => request<void>('POST', '/api/push/test'),
   settings: () => request<UserSettings>('GET', '/api/settings'),
   saveSettings: (raw: string) => request<UserSettings>('PUT', '/api/settings', { raw }),
   themes: () => request<Theme[]>('GET', '/api/themes'),

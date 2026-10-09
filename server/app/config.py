@@ -42,6 +42,13 @@ class Settings(BaseSettings):
     # Where task workspaces clone from. {owner} and {name} are filled in.
     git_url_template: str = "https://github.com/{owner}/{name}.git"
 
+    # Origin that serves app previews (dev servers running in task workspaces), e.g.
+    # https://preview.example.com. It must differ from public_url, so a previewed app can't
+    # reach the IDE's session. Unset disables previews.
+    preview_url: str = ""
+    # Docker network shared by the server and task containers, so previews can reach them.
+    docker_network: str = ""
+
     # Enables POST /api/auth/dev-login. Only for local development and end-to-end tests.
     dev_login: bool = False
     cookie_secure: bool = False

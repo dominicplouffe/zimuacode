@@ -35,10 +35,13 @@ def session_token(request: Request) -> str | None:
     return request.cookies.get(SESSION_COOKIE)
 
 
-def current_user(request: Request, db: DbDep, settings: SettingsDep) -> User:
-    token = session_token(request)
+def user_for_token(db: Session, token: str | None, settings: Settings) -> User | None:
     data = unsign(token, SESSION_SALT, settings.session_max_age_days * 86400) if token else None
-    user = db.get(User, data.get("uid")) if isinstance(data, dict) else None
+    return db.get(User, data.get("uid")) if isinstance(data, dict) else None
+
+
+def current_user(request: Request, db: DbDep, settings: SettingsDep) -> User:
+    user = user_for_token(db, session_token(request), settings)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not signed in")
     if request.method not in ("GET", "HEAD", "OPTIONS") and CSRF_HEADER not in request.headers:

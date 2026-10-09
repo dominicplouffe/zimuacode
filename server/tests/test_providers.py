@@ -14,7 +14,7 @@ from app.tasks.providers import (
     DispatchParser,
     TurnContext,
 )
-from tests.test_tasks import app_client, events, remote, runner_env, start, wait_for  # noqa: F401
+from tests.helpers import events, start, wait_for
 
 
 class FakeTask:
@@ -117,14 +117,14 @@ def test_dispatch_parser() -> None:
     assert p.result.failed
 
 
-def test_every_provider_is_listed(app_client: TestClient) -> None:  # noqa: F811
+def test_every_provider_is_listed(app_client: TestClient) -> None:
     listed = {p["id"]: p for p in app_client.get("/api/providers").json()}
     assert set(listed) == set(PROVIDERS)
     assert listed["codex-cloud"]["experimental"] is True
     assert listed["codex"]["capabilities"]["runs_on"] == "self"
 
 
-def test_codex_task_end_to_end(app_client: TestClient) -> None:  # noqa: F811
+def test_codex_task_end_to_end(app_client: TestClient) -> None:
     task_id = start(app_client, "Add codex notes", provider="codex")
     task = wait_for(app_client, task_id, "idle", "failed")
     assert task["status"] == "idle", [
@@ -146,7 +146,7 @@ def test_codex_task_end_to_end(app_client: TestClient) -> None:  # noqa: F811
     assert changes == [{"path": "CODEX.md", "status": "A"}]
 
 
-def test_codex_cloud_hand_off_and_fetch(app_client: TestClient) -> None:  # noqa: F811
+def test_codex_cloud_hand_off_and_fetch(app_client: TestClient) -> None:
     app_client.put("/api/settings", json={"raw": '{"ai.codexCloudEnvironment": "env_1"}'})
     task_id = start(app_client, "Do it in the cloud", provider="codex-cloud")
     wait_for(app_client, task_id, "idle", "failed")
@@ -174,7 +174,7 @@ def test_codex_cloud_hand_off_and_fetch(app_client: TestClient) -> None:  # noqa
     assert "already in this workspace" in texts[-1]
 
 
-def test_codex_cloud_needs_an_environment(app_client: TestClient) -> None:  # noqa: F811
+def test_codex_cloud_needs_an_environment(app_client: TestClient) -> None:
     task_id = start(app_client, "x", provider="codex-cloud")
     wait_for(app_client, task_id, "failed", "idle")
     texts = [
@@ -183,7 +183,7 @@ def test_codex_cloud_needs_an_environment(app_client: TestClient) -> None:  # no
     assert "ai.codexCloudEnvironment" in texts[0]
 
 
-def test_claude_cloud_hand_off(app_client: TestClient) -> None:  # noqa: F811
+def test_claude_cloud_hand_off(app_client: TestClient) -> None:
     task_id = start(app_client, "Do it on the web", provider="claude-cloud")
     task = wait_for(app_client, task_id, "idle", "failed")
     assert task["status"] == "idle"

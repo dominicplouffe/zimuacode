@@ -12,6 +12,7 @@ dependencies = [
     "itsdangerous>=2.2",
     "pydantic-settings>=2.4",
     "jsonschema>=4.23",
+    "pywebpush>=2.5.0",
 ]
 
 [dependency-groups]
@@ -54,5 +55,5 @@ plugins = ["pydantic.mypy"]
 exclude = ["tests/"]
 
 [[tool.mypy.overrides]]
-module = ["jsonschema.*"]
+module = ["jsonschema.*", "py_vapid.*", "pywebpush.*"]
 ignore_missing_imports = true

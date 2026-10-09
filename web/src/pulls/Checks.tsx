@@ -36,7 +36,7 @@ export function openCheck(check: Check) {
   }
 }
 
-export function ChecksList({ checks }: { checks: Check[] }) {
+export function ChecksList({ checks, onFix }: { checks: Check[]; onFix?: (check: Check) => void }) {
   if (checks.length === 0) return <p className="muted">No checks reported.</p>
   return (
     <ul className="checks" aria-label="Checks">
@@ -56,6 +56,11 @@ export function ChecksList({ checks }: { checks: Check[] }) {
               <span>{c.name}</span>
             )}
             <span className="muted">{c.conclusion ?? c.status.replace('_', ' ')}</span>
+            {onFix && state === 'failure' && c.has_logs && (
+              <button className="link-button" onClick={() => onFix(c)}>
+                Fix with agent
+              </button>
+            )}
           </li>
         )
       })}

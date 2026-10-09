@@ -12,8 +12,15 @@ export function NewTask() {
   const branches = useBranches(repo)
   const [provider, setProvider] = useState<string | null>(null)
   const [model, setModel] = useState<string | null>(null)
-  const [base, setBase] = useState(repo?.ref ?? '')
-  const [prompt, setPrompt] = useState('')
+  // A draft (e.g. from "Fix with agent") prefills the form once.
+  const [draft] = useState(() => {
+    const d = useWorkbench.getState().newTaskDraft
+    useWorkbench.setState({ newTaskDraft: null })
+    return d
+  })
+  const [base, setBase] = useState(draft?.baseBranch ?? repo?.ref ?? '')
+  const [prompt, setPrompt] = useState(draft?.prompt ?? '')
+  const prNumber = draft?.prNumber ?? null
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -43,6 +50,7 @@ export function NewTask() {
         base_branch: base,
         prompt: prompt.trim(),
         model: chosenModel.trim() || null,
+        pr_number: prNumber,
       })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       closeTab('newTask')
@@ -101,14 +109,25 @@ export function NewTask() {
           />
         </label>
         <label>
-          Start from
-          <select className="input" aria-label="Base branch" value={base} onChange={(e) => setBase(e.target.value)}>
+          {prNumber ? 'Works on' : 'Start from'}
+          <select
+            className="input"
+            aria-label="Base branch"
+            value={base}
+            disabled={prNumber !== null}
+            onChange={(e) => setBase(e.target.value)}
+          >
             {(branches.data ?? [{ name: base }]).map((b) => (
               <option key={b.name}>{b.name}</option>
             ))}
           </select>
         </label>
       </div>
+      {prNumber !== null && (
+        <p className="muted">
+          The agent works directly on <code>{base}</code>, so publishing pushes to PR #{prNumber}.
+        </p>
+      )}
       {info?.capabilities.runs_on === 'vendor' && (
         <p className="muted">
           {info.name} runs the task on the vendor's own servers. You get a link to follow it there; the transcript doesn't

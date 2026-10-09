@@ -7,6 +7,8 @@ import { CreatePullRequest } from '../pulls/CreatePullRequest'
 import { PullRequestView } from '../pulls/PullRequestView'
 import { Accounts } from '../tasks/Accounts'
 import { NewTask } from '../tasks/NewTask'
+import { RepoSettings } from '../tasks/RepoSettings'
+import { UsageView } from '../tasks/UsageView'
 import { TaskDiffView } from '../tasks/TaskDiffView'
 import { TaskView } from '../tasks/TaskView'
 import { useTask } from '../api/hooks'
@@ -41,6 +43,10 @@ export function tabTitle(tab: Tab, taskTitle?: string): string {
       return `${basename(tab.path)} (agent)`
     case 'accounts':
       return 'Agent accounts'
+    case 'repoSettings':
+      return 'Agent repo settings'
+    case 'usage':
+      return 'Agent usage'
   }
 }
 
@@ -117,6 +123,8 @@ export function EditorArea({ monacoTheme }: { monacoTheme: string }) {
         {active?.kind === 'task' && <TaskView key={active.id} taskId={active.taskId} />}
         {active?.kind === 'newTask' && <NewTask />}
         {active?.kind === 'accounts' && <Accounts />}
+        {active?.kind === 'repoSettings' && <RepoSettings />}
+        {active?.kind === 'usage' && <UsageView />}
         {active?.kind === 'taskDiff' && (
           <TaskDiffView key={active.id} taskId={active.taskId} path={active.path} theme={monacoTheme} />
         )}

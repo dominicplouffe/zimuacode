@@ -31,6 +31,19 @@ class ProviderCredential(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=_now)
 
 
+class RepoConfig(SQLModel, table=True):
+    """Per-repository settings for agent tasks."""
+
+    user_id: int = Field(foreign_key="user.id", primary_key=True)
+    owner: str = Field(primary_key=True)
+    name: str = Field(primary_key=True)
+    # JSON object of environment variables, Fernet-encrypted. Values never leave the server.
+    env_enc: str = ""
+    # Runs in the workspace after cloning, before the agent starts (e.g. `npm ci`).
+    setup_script: str = ""
+    updated_at: datetime = Field(default_factory=_now)
+
+
 class Task(SQLModel, table=True):
     """One agent conversation, working on its own branch in its own workspace."""
 
@@ -69,4 +82,15 @@ class TaskEvent(SQLModel, table=True):
     seq: int
     type: str
     data: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=_now)
+
+
+class PushSubscription(SQLModel, table=True):
+    """A browser's Web Push subscription, for notifications when the IDE isn't open."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id", index=True)
+    endpoint: str = Field(unique=True)
+    p256dh: str
+    auth: str
     created_at: datetime = Field(default_factory=_now)

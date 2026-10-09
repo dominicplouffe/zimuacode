@@ -55,7 +55,16 @@ emit(
     }
 )
 
-if prompt.startswith("sleep"):
+if prompt.startswith("env "):
+    name = prompt.split()[1]
+    emit(
+        {
+            "type": "assistant",
+            "parent_tool_use_id": None,
+            "message": {"content": [{"type": "text", "text": f"{name}={os.environ.get(name)}"}]},
+        }
+    )
+elif prompt.startswith("sleep"):
     time.sleep(float(prompt.split()[1]))
 elif prompt == "fail":
     emit(

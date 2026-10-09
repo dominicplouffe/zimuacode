@@ -36,6 +36,8 @@ export default defineConfig({
         ZIMUA_DATA_DIR: './.e2e-data',
         ZIMUA_GIT_URL_TEMPLATE: `file://${path.resolve('../server/.e2e-data/git')}/{owner}/{name}.git`,
         ZIMUA_CLAUDE_BIN: `python3 ${path.resolve('../server/tests/fake_agent.py')}`,
+        // A different host from the IDE (localhost), so previews get their own origin.
+        ZIMUA_PREVIEW_URL: `http://127.0.0.1:${PORT}`,
         ZIMUA_CODEX_BIN: `python3 ${path.resolve('../server/tests/fake_codex.py')}`,
       },
     },

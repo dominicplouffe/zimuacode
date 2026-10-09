@@ -1,6 +1,7 @@
 """Runs agent tasks: one turn at a time, tailing each turn's output into task events."""
 
 import asyncio
+import json
 import logging
 import re
 import shutil
@@ -13,7 +14,8 @@ from sqlmodel import Session, select
 
 from app.config import Settings
 from app.db import get_engine
-from app.models import ProviderCredential, Task, User
+from app.models import ProviderCredential, RepoConfig, Task, User
+from app.notify import Notifier
 from app.security import decrypt
 from app.tasks import git
 from app.tasks.events import EventBus
@@ -27,6 +29,7 @@ POLL_SECONDS = 0.25
 LIVENESS_SECONDS = 5.0
 # A launched turn that hasn't written its pid file by then is treated as failed to start.
 START_TIMEOUT_SECONDS = 60.0
+SETUP_TIMEOUT_SECONDS = 30 * 60
 
 ACTIVE = ("preparing", "running")
 
@@ -53,6 +56,16 @@ def user_settings(user_id: int) -> dict[str, Any]:
         return effective(user.settings_json if user else "{}")
 
 
+def repo_config(user_id: int, owner: str, name: str) -> tuple[dict[str, str], str]:
+    """A repository's agent environment variables and setup script."""
+    with Session(get_engine()) as s:
+        row = s.get(RepoConfig, (user_id, owner, name))
+    if row is None:
+        return {}, ""
+    env = json.loads(decrypt(row.env_enc)) if row.env_enc else {}
+    return env, row.setup_script
+
+
 def credential_for(user_id: int, provider: str) -> str | None:
     with Session(get_engine()) as s:
         row = s.get(ProviderCredential, (user_id, provider))
@@ -60,10 +73,13 @@ def credential_for(user_id: int, provider: str) -> str | None:
 
 
 class TaskManager:
-    def __init__(self, settings: Settings, bus: EventBus, sandbox: Sandbox) -> None:
+    def __init__(
+        self, settings: Settings, bus: EventBus, sandbox: Sandbox, notifier: Notifier | None = None
+    ) -> None:
         self.settings = settings
         self.bus = bus
         self.sandbox = sandbox
+        self.notifier = notifier
         self._jobs: dict[str, asyncio.Task[None]] = {}
 
     # Persistence helpers
@@ -125,7 +141,10 @@ class TaskManager:
         prompt: str,
         model: str | None,
         github_token: str,
+        pr_number: int | None = None,
     ) -> Task:
+        """Starts a task on a new branch from base_branch, or, with pr_number, directly on
+        that PR's branch (base_branch is then the PR's head branch)."""
         if provider not in PROVIDERS:
             raise TaskError(f"Unknown provider {provider}")
         task_id = uuid.uuid4().hex[:12]
@@ -138,7 +157,8 @@ class TaskManager:
             repo_owner=owner,
             repo_name=name,
             base_branch=base_branch,
-            branch=f"zimua/{slugify(prompt)}-{task_id[:6]}",
+            branch=base_branch if pr_number else f"zimua/{slugify(prompt)}-{task_id[:6]}",
+            pr_number=pr_number,
             # Claude Code accepts a preset session id, which makes resuming reliable.
             session_id=str(uuid.uuid4()) if provider == "claude-code" else None,
         )
@@ -162,12 +182,39 @@ class TaskManager:
             self.set_status(task_id, "preparing", "Starting agent")
             await self.sandbox.prepare(task_id)
             (self.root(task_id) / "home").mkdir(parents=True, exist_ok=True)
+            env, setup = repo_config(task.user_id, task.repo_owner, task.repo_name)
+            if setup.strip() and not await self._run_setup(task_id, setup, env):
+                return
         except Exception as e:
             log.exception("preparing task %s failed", task_id)
             self.bus.publish(task_id, "error", {"message": f"Couldn't prepare workspace: {e}"})
             self.set_status(task_id, "failed", "Workspace setup failed")
+            self._notify_turn_end(self.load(task_id))
             return
         await self._start_turn(task_id, prompt)
+
+    async def _run_setup(self, task_id: str, script: str, env: dict[str, str]) -> bool:
+        self.set_status(task_id, "preparing", "Running setup script")
+        path = self.root(task_id) / "turns" / "setup.sh"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(script)
+
+        def on_line(line: str) -> None:
+            self.bus.publish(task_id, "log", {"text": line, "source": "setup"})
+
+        try:
+            code = await asyncio.wait_for(
+                self.sandbox.run(task_id, ["sh", "-e", "../turns/setup.sh"], env, on_line),
+                SETUP_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            code = None
+        if code == 0:
+            return True
+        reason = "timed out" if code is None else f"exited with code {code}"
+        self.bus.publish(task_id, "error", {"message": f"The setup script {reason}."})
+        self.set_status(task_id, "failed", "Setup script failed")
+        return False
 
     async def _start_turn(self, task_id: str, prompt: str) -> None:
         task = self.update(
@@ -190,11 +237,13 @@ class TaskManager:
         )
         try:
             provider.setup_home(ctx)
+            repo_env, _ = repo_config(task.user_id, task.repo_owner, task.repo_name)
             write_turn_script(
                 self.root(task_id),
                 task.turn,
                 provider.command(ctx),
-                provider.env(ctx),
+                # The agent's own login wins over a same-named repo variable.
+                repo_env | provider.env(ctx),
                 provider.prompt(ctx, prompt),
                 self.sandbox.home(task_id),
             )
@@ -299,6 +348,21 @@ class TaskManager:
             next_prompt, *rest = task.pending
             self.update(task_id, pending=rest)
             await self._start_turn(task_id, next_prompt)
+            return
+        self._notify_turn_end(task)
+
+    def _notify_turn_end(self, task: Task) -> None:
+        # Interruptions are the user's own doing; everything else is worth a ping.
+        if self.notifier is None or task.status not in ("idle", "failed"):
+            return
+        title = "Agent finished" if task.status == "idle" else "Agent failed"
+        self.notifier.notify(
+            task.user_id,
+            title,
+            f"{task.title} · {task.repo_owner}/{task.repo_name}",
+            self.notifier.task_link(task.id),
+            tag=f"task-{task.id}",
+        )
 
     # Requests from the UI
 

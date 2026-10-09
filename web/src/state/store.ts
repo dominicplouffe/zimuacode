@@ -23,6 +23,8 @@ export type Tab =
   | { id: 'newTask'; kind: 'newTask' }
   | { id: string; kind: 'taskDiff'; taskId: string; path: string }
   | { id: 'accounts'; kind: 'accounts' }
+  | { id: 'repoSettings'; kind: 'repoSettings' }
+  | { id: 'usage'; kind: 'usage' }
 
 export type SidebarView = 'explorer' | 'scm' | 'pulls' | 'tasks'
 export type Palette =
@@ -45,6 +47,10 @@ interface WorkbenchState {
   sidebarVisible: boolean
   palette: Palette
   toast: { message: string; error: boolean } | null
+  /** The task whose terminal shows in the bottom panel; null hides the panel. */
+  terminalTask: string | null
+  /** Prefills the next new-task form, e.g. from "Fix with agent" on a failing check. */
+  newTaskDraft: { prompt: string; baseBranch: string; prNumber: number | null } | null
   notify: (message: string, error?: boolean) => void
   openRepo: (repo: RepoRef) => void
   setRef: (ref: string) => void
@@ -87,6 +93,8 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   sidebarVisible: true,
   palette: null,
   toast: null,
+  terminalTask: null,
+  newTaskDraft: null,
 
   notify: (message, error = false) => {
     const toast = { message, error }
@@ -98,7 +106,7 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   openRepo: (repo) => {
     saveLastRepo(repo)
     // Settings, accounts and agent tasks aren't tied to the repo being browsed.
-    const tabs = get().tabs.filter((t) => ['settings', 'accounts', 'task', 'taskDiff'].includes(t.kind))
+    const tabs = get().tabs.filter((t) => ['settings', 'accounts', 'task', 'taskDiff', 'usage'].includes(t.kind))
     set({ repo, tabs, activeTab: tabs[0]?.id ?? null })
   },
   setRef: (ref) => {

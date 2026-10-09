@@ -258,6 +258,46 @@ function Publish({ task }: { task: TaskSummary }) {
   )
 }
 
+function Preview({ task }: { task: TaskSummary }) {
+  const [port, setPort] = useState('3000')
+  const [error, setError] = useState<string | null>(null)
+  const open = async () => {
+    setError(null)
+    // Open the window now, while the click still counts as a user gesture; popup blockers
+    // would stop a window opened after the request.
+    const win = window.open('about:blank', '_blank')
+    try {
+      const { url } = await api.preview(task.id, Number(port))
+      if (win) win.location.href = url
+      else window.location.href = url
+    } catch (e) {
+      win?.close()
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  return (
+    <div className="task-publish">
+      <div className="merge-row">
+        <input
+          className="input"
+          aria-label="Preview port"
+          inputMode="numeric"
+          value={port}
+          onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))}
+          style={{ width: 90 }}
+        />
+        <button className="button secondary" disabled={!port} onClick={open}>
+          Open preview
+        </button>
+      </div>
+      <div className="muted">
+        Start a dev server bound to 0.0.0.0 (e.g. <code>npm run dev -- -H 0.0.0.0</code>) in the task's terminal.
+      </div>
+      {error && <div className="error">{error}</div>}
+    </div>
+  )
+}
+
 function SidePanel({ task }: { task: TaskSummary }) {
   const openTab = useWorkbench((s) => s.openTab)
   const changes = useTaskChanges(task.id, task.status !== 'stopped' && task.status !== 'preparing')
@@ -292,6 +332,14 @@ function SidePanel({ task }: { task: TaskSummary }) {
             <span>Pull request</span>
           </div>
           <Publish task={task} />
+          {task.status !== 'preparing' && (
+            <>
+              <div className="sidebar-section-header">
+                <span>Preview</span>
+              </div>
+              <Preview task={task} />
+            </>
+          )}
           <div className="task-archive">
             <button className="link-button" onClick={archive}>
               Archive task
@@ -333,6 +381,15 @@ export function TaskView({ taskId }: { taskId: string }) {
               <code>{t.branch}</code> from <code>{t.base_branch}</code>
             </span>
             <span className="muted">{formatCost(t)}</span>
+            {t.status !== 'stopped' && t.status !== 'preparing' && (
+              <button
+                className="button secondary"
+                onClick={() => useWorkbench.setState({ terminalTask: t.id })}
+                title="A shell in this task's workspace (Ctrl+`)"
+              >
+                Terminal
+              </button>
+            )}
             {!connected && t.status !== 'stopped' && <span className="muted">reconnecting…</span>}
           </div>
         </header>

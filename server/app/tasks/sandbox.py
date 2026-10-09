@@ -18,6 +18,7 @@ import contextlib
 import os
 import shlex
 import signal
+from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol
 
@@ -59,6 +60,29 @@ def write_turn_script(
     return script
 
 
+# Environment variables a local agent process may inherit from the server. Everything else
+# (the server's secret key, OAuth secrets...) stays out of the agent's reach.
+SAFE_ENV = (
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "LC_CTYPE",
+    "TZ",
+    "TMPDIR",
+    "SHELL",
+    "USER",
+    "LOGNAME",
+    "TERM",
+)
+
+
+def safe_env(extra: dict[str, str] | None = None) -> dict[str, str]:
+    return {k: os.environ[k] for k in SAFE_ENV if k in os.environ} | (extra or {})
+
+
+LineSink = Callable[[str], None]
+
+
 class Sandbox(Protocol):
     async def prepare(self, task_id: str) -> None:
         """Makes the task's environment ready to run turns (e.g. starts its container)."""
@@ -71,6 +95,12 @@ class Sandbox(Protocol):
     async def interrupt(self, task_id: str, pid: int) -> None: ...
 
     async def destroy(self, task_id: str) -> None: ...
+
+    async def run(
+        self, task_id: str, argv: list[str], env: dict[str, str], on_line: LineSink
+    ) -> int:
+        """Runs a command in the workspace to completion, streaming its output."""
+        ...
 
     def home(self, task_id: str) -> str:
         """The agent's HOME, as seen by the agent."""
@@ -99,6 +129,7 @@ class LocalSandbox:
             "-c",
             'sh "$0" </dev/null >/dev/null 2>&1 &',
             str(script),
+            env=safe_env(),
             start_new_session=True,
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.DEVNULL,
@@ -121,6 +152,21 @@ class LocalSandbox:
 
     async def destroy(self, task_id: str) -> None:
         pass
+
+    async def run(
+        self, task_id: str, argv: list[str], env: dict[str, str], on_line: LineSink
+    ) -> int:
+        root = task_dir(self._settings, task_id)
+        proc = await asyncio.create_subprocess_exec(
+            *argv,
+            cwd=root / "repo",
+            env=safe_env({"HOME": self.home(task_id), **env}),
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+            start_new_session=True,
+        )
+        return await _pump(proc, on_line)
 
 
 class DockerSandbox:
@@ -169,6 +215,7 @@ class DockerSandbox:
             "--workdir", "/workspace/repo",
             "--env", "HOME=/workspace/home",
             "--init",
+            *(["--network", network] if (network := self._settings.docker_network) else []),
             self._settings.runner_image,
             "sleep", "infinity",
         )  # fmt: skip
@@ -191,6 +238,31 @@ class DockerSandbox:
 
     async def destroy(self, task_id: str) -> None:
         await self._docker("rm", "--force", self.container(task_id), check=False)
+
+    async def run(
+        self, task_id: str, argv: list[str], env: dict[str, str], on_line: LineSink
+    ) -> int:
+        await self.prepare(task_id)
+        flags = [x for k, v in env.items() for x in ("--env", f"{k}={v}")]
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "exec", *flags, self.container(task_id), *argv,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )  # fmt: skip
+        return await _pump(proc, on_line)
+
+
+async def _pump(proc: asyncio.subprocess.Process, on_line: LineSink) -> int:
+    try:
+        assert proc.stdout is not None
+        async for raw in proc.stdout:
+            on_line(raw.decode(errors="replace").rstrip("\n"))
+        return await proc.wait()
+    except asyncio.CancelledError:
+        with contextlib.suppress(ProcessLookupError):
+            proc.kill()
+        raise
 
 
 def make_sandbox(settings: Settings) -> Sandbox:

@@ -1,5 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { disablePush, enablePush, pushState, type PushState } from './notifications'
 import { api, type Provider } from '../api/client'
 import { useProviders } from '../api/hooks'
 
@@ -67,6 +68,54 @@ function ProviderAccount({ providers }: { providers: Provider[] }) {
   )
 }
 
+function Notifications() {
+  const [state, setState] = useState<PushState | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    pushState().then(setState, () => setState('unsupported'))
+  }, [])
+  const run = async (action: () => Promise<PushState>) => {
+    setError(null)
+    try {
+      setState(await action())
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
+  return (
+    <section className="pr-section" aria-label="Notifications">
+      <h2>Notifications on this device</h2>
+      <p className="muted">
+        Get a notification when an agent finishes or fails, or CI fails on a pull request an agent opened, even with the IDE
+        closed. Turn them off everywhere with <code>notifications.enabled</code> in settings.json.
+      </p>
+      {state === 'unsupported' && (
+        <p className="muted">This browser can't receive push notifications (the desktop app can't either, yet).</p>
+      )}
+      {state === 'denied' && <p className="muted">Notifications are blocked for this site in your browser settings.</p>}
+      <div className="merge-row">
+        {state === 'off' && (
+          <button className="button" onClick={() => run(enablePush)}>
+            Enable notifications
+          </button>
+        )}
+        {state === 'on' && (
+          <>
+            <span className="task-status status-idle">On</span>
+            <button className="button secondary" onClick={() => run(async () => (await api.testPush(), 'on'))}>
+              Send a test
+            </button>
+            <button className="button secondary" onClick={() => run(disablePush)}>
+              Turn off
+            </button>
+          </>
+        )}
+      </div>
+      {error && <p className="error">{error}</p>}
+    </section>
+  )
+}
+
 export function Accounts() {
   const providers = useProviders()
   const groups: Provider[][] = []
@@ -86,6 +135,7 @@ export function Accounts() {
       {groups.map((group) => (
         <ProviderAccount key={group[0].credential_key} providers={group} />
       ))}
+      <Notifications />
     </div>
   )
 }

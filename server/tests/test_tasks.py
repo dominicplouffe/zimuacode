@@ -1,10 +1,6 @@
 import json
-import subprocess
-import sys
 import time
-from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
 
 import pytest
 import respx
@@ -13,77 +9,7 @@ from fastapi.testclient import TestClient
 from app import db
 from app.config import get_settings
 from app.tasks.providers import ClaudeParser
-
-FAKE_AGENT = Path(__file__).with_name("fake_agent.py")
-FAKE_CODEX = Path(__file__).with_name("fake_codex.py")
-
-
-def _git(cwd: Path, *args: str) -> str:
-    return subprocess.run(
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
-    ).stdout
-
-
-@pytest.fixture
-def remote(tmp_path: Path) -> Path:
-    """A bare repo standing in for github.com/octo/app."""
-    src = tmp_path / "src"
-    src.mkdir()
-    _git(src, "init", "-q", "-b", "main")
-    (src / "README.md").write_text("# App\n")
-    _git(src, "add", ".")
-    _git(src, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "init")
-    bare = tmp_path / "git" / "octo" / "app.git"
-    bare.parent.mkdir(parents=True)
-    _git(tmp_path, "clone", "-q", "--bare", str(src), str(bare))
-    return bare
-
-
-@pytest.fixture
-def runner_env(env: None, tmp_path: Path, remote: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ZIMUA_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("ZIMUA_GIT_URL_TEMPLATE", f"file://{tmp_path}/git/{{owner}}/{{name}}.git")
-    monkeypatch.setenv("ZIMUA_CLAUDE_BIN", f"{sys.executable} {FAKE_AGENT}")
-    monkeypatch.setenv("ZIMUA_CODEX_BIN", f"{sys.executable} {FAKE_CODEX}")
-    get_settings.cache_clear()
-
-
-@pytest.fixture
-def app_client(runner_env: None, gh: respx.MockRouter) -> Iterator[TestClient]:
-    from app.main import create_app
-
-    with TestClient(create_app(), base_url="http://ide.test") as c:
-        assert c.post("/api/auth/dev-login", json={"token": "ghtok"}).status_code == 200
-        c.headers["x-zimua"] = "1"
-        yield c
-
-
-def wait_for(
-    client: TestClient, task_id: str, *statuses: str, timeout: float = 20
-) -> dict[str, Any]:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        task = client.get(f"/api/tasks/{task_id}").json()
-        if task["status"] in statuses:
-            return task
-        time.sleep(0.1)
-    raise AssertionError(f"task stayed {task['status']}, wanted {statuses}")
-
-
-def events(client: TestClient, task_id: str) -> list[dict[str, Any]]:
-    from app.tasks.events import EventBus
-
-    return EventBus().history(task_id)
-
-
-def start(client: TestClient, prompt: str, provider: str = "claude-code") -> str:
-    resp = client.post(
-        "/api/tasks",
-        json={"provider": provider, "owner": "octo", "name": "app",
-              "base_branch": "main", "prompt": prompt},
-    )  # fmt: skip
-    assert resp.status_code == 201, resp.text
-    return str(resp.json()["id"])
+from tests.helpers import _git, events, start, wait_for
 
 
 def test_task_runs_and_streams_normalized_events(app_client: TestClient) -> None:
@@ -304,3 +230,69 @@ def test_claude_parser() -> None:
     assert len(out) == 5
     assert p.result.session_id == "s1"
     assert p.result.failed is True
+
+
+def test_task_on_an_existing_pr_branch(
+    app_client: TestClient, gh: respx.MockRouter, remote: Path
+) -> None:
+    # The PR's branch exists on the remote.
+    src = remote.parent / "fix-src"
+    _git(remote.parent, "clone", "-q", str(remote), str(src))
+    _git(src, "checkout", "-q", "-b", "feat/x")
+    (src / "app.py").write_text("broken\n")
+    _git(src, "add", ".")
+    _git(src, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "feat")
+    _git(src, "push", "-q", "origin", "feat/x")
+
+    pull = {
+        "number": 9, "state": "open", "html_url": "https://github.com/octo/app/pull/9",
+        "head": {"ref": "feat/x", "repo": {"full_name": "octo/app"}}, "base": {"ref": "main"},
+    }  # fmt: skip
+    gh.get("/repos/octo/app/pulls/9").respond(json=pull)
+    resp = app_client.post(
+        "/api/tasks",
+        json={"provider": "claude-code", "owner": "octo", "name": "app",
+              "base_branch": "feat/x", "prompt": "Fix CI", "pr_number": 9},
+    )  # fmt: skip
+    assert resp.status_code == 201, resp.text
+    task = wait_for(app_client, resp.json()["id"], "idle")
+    assert task["branch"] == "feat/x"
+    assert task["pr_number"] == 9
+
+    published = app_client.post(f"/api/tasks/{task['id']}/publish", json={"title": "Fix CI"}).json()
+    assert published == {"pr_number": 9, "url": pull["html_url"], "created": False}
+    assert _git(remote, "show", "feat/x:AGENT.md") == "Fix CI\n"
+    assert _git(remote, "show", "feat/x:app.py") == "broken\n"
+
+
+def test_pr_task_must_match_the_pr(app_client: TestClient, gh: respx.MockRouter) -> None:
+    gh.get("/repos/octo/app/pulls/9").respond(
+        json={
+            "number": 9,
+            "state": "open",
+            "head": {"ref": "feat/x", "repo": {"full_name": "fork/app"}},
+            "base": {"ref": "main"},
+        }
+    )
+    body = {
+        "provider": "claude-code",
+        "owner": "octo",
+        "name": "app",
+        "prompt": "x",
+        "pr_number": 9,
+    }
+    assert app_client.post("/api/tasks", json={**body, "base_branch": "main"}).status_code == 409
+    assert app_client.post("/api/tasks", json={**body, "base_branch": "feat/x"}).status_code == 409
+
+
+def test_usage(app_client: TestClient) -> None:
+    empty = app_client.get("/api/usage").json()
+    assert empty["total"]["tasks"] == 0
+    for prompt in ("one", "two"):
+        wait_for(app_client, start(app_client, prompt), "idle")
+    usage = app_client.get("/api/usage").json()
+    assert usage["total"] == {
+        "key": "all", "tasks": 2, "cost_usd": pytest.approx(0.02), "input_tokens": 300, "output_tokens": 40,
+    }  # fmt: skip
+    assert [r["key"] for r in usage["by_provider"]] == ["claude-code"]
+    assert [r["key"] for r in usage["by_repo"]] == ["octo/app"]

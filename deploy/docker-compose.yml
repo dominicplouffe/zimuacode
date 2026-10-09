@@ -18,6 +18,10 @@ services:
       # directory must have the same path on the host and in this container.
       ZIMUA_DATA_DIR: /srv/zimua
       ZIMUA_DATABASE_URL: sqlite:////srv/zimua/zimua.db
+      # App previews get their own origin; task containers join this network so the
+      # server can reach their dev servers.
+      ZIMUA_PREVIEW_URL: https://${ZIMUA_PREVIEW_DOMAIN}
+      ZIMUA_DOCKER_NETWORK: zimua
     user: "1000:1000"
     group_add:
       - ${DOCKER_GID}
@@ -41,12 +45,17 @@ services:
       - "443:443"
     environment:
       ZIMUA_DOMAIN: ${ZIMUA_DOMAIN}
+      ZIMUA_PREVIEW_DOMAIN: ${ZIMUA_PREVIEW_DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
     depends_on:
       - server
     restart: unless-stopped
+
+networks:
+  default:
+    name: zimua
 
 volumes:
   caddy-data:

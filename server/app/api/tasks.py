@@ -12,6 +12,7 @@ from sqlmodel import col, select
 from app.api.common import gh_call
 from app.deps import DbDep, GitHubDep, UserDep
 from app.models import ProviderCredential, Task, User
+from app.preview import preview_link
 from app.security import decrypt, encrypt
 from app.tasks import git
 from app.tasks.manager import TaskError, TaskManager
@@ -65,6 +66,8 @@ class NewTask(BaseModel):
     base_branch: str
     prompt: str = Field(min_length=1)
     model: str | None = None
+    # Work directly on this open PR's branch (base_branch must be its head), e.g. to fix CI.
+    pr_number: int | None = None
 
 
 class Message(BaseModel):
@@ -172,7 +175,22 @@ def list_tasks(
 
 
 @router.post("/tasks", status_code=status.HTTP_201_CREATED)
-async def create_task(body: NewTask, user: UserDep, manager: ManagerDep) -> TaskSummary:
+async def create_task(
+    body: NewTask, user: UserDep, manager: ManagerDep, gh: GitHubDep
+) -> TaskSummary:
+    if body.pr_number is not None:
+        pull = await gh_call(gh.pull(body.owner, body.name, body.pr_number))
+        head = pull["head"]
+        if pull["state"] != "open" or head["ref"] != body.base_branch:
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "That pull request isn't open on this branch"
+            )
+        if (head.get("repo") or {}).get("full_name") != f"{body.owner}/{body.name}":
+            raise HTTPException(
+                status.HTTP_409_CONFLICT, "Pull requests from forks can't be worked on"
+            )
+        if head["ref"] == pull["base"]["ref"]:
+            raise HTTPException(status.HTTP_409_CONFLICT, "Refusing to work on the base branch")
     try:
         task = manager.create(
             user_id=user.id or 0,
@@ -183,9 +201,10 @@ async def create_task(body: NewTask, user: UserDep, manager: ManagerDep) -> Task
             prompt=body.prompt,
             model=body.model,
             github_token=decrypt(user.token_enc),
+            pr_number=body.pr_number,
         )
     except TaskError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
     return _summary(task)
 
 
@@ -254,8 +273,9 @@ async def interrupt_task(task_id: str, user: UserDep, manager: ManagerDep) -> Ta
 
 
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def archive_task(task_id: str, user: UserDep, manager: ManagerDep) -> None:
+async def archive_task(task_id: str, request: Request, user: UserDep, manager: ManagerDep) -> None:
     _own_task(manager, task_id, user)
+    request.app.state.terminals.close(task_id)
     await manager.stop(task_id)
 
 
@@ -309,7 +329,12 @@ async def task_file(
 
 @router.post("/tasks/{task_id}/publish")
 async def publish_task(
-    task_id: str, body: Publish, user: UserDep, manager: ManagerDep, gh: GitHubDep
+    task_id: str,
+    body: Publish,
+    request: Request,
+    user: UserDep,
+    manager: ManagerDep,
+    gh: GitHubDep,
 ) -> PublishResult:
     """Commits the workspace, pushes the task's branch and opens (or updates) its PR."""
     task = _own_task(manager, task_id, user)
@@ -347,4 +372,69 @@ async def publish_task(
     manager.bus.publish(
         task_id, "pr", {"number": pull["number"], "url": pull["html_url"], "created": created}
     )
+    request.app.state.notifier.watch_ci(
+        user.id or 0, request.app.state.http, decrypt(user.token_enc), owner, name, pull["number"]
+    )
     return PublishResult(pr_number=pull["number"], url=pull["html_url"], created=created)
+
+
+class UsageRow(BaseModel):
+    key: str
+    tasks: int
+    cost_usd: float
+    input_tokens: int
+    output_tokens: int
+
+
+class Usage(BaseModel):
+    by_provider: list[UsageRow]
+    by_repo: list[UsageRow]
+    # Subscription logins (setup tokens, ChatGPT plans) report no cost; tokens still count.
+    total: UsageRow
+
+
+@router.get("/usage")
+def usage(user: UserDep, db: DbDep) -> Usage:
+    tasks = db.exec(select(Task).where(Task.user_id == user.id)).all()
+
+    def rows(key: Any) -> list[UsageRow]:
+        groups: dict[str, UsageRow] = {}
+        for t in tasks:
+            k = key(t)
+            row = groups.setdefault(
+                k, UsageRow(key=k, tasks=0, cost_usd=0, input_tokens=0, output_tokens=0)
+            )
+            row.tasks += 1
+            row.cost_usd += t.cost_usd
+            row.input_tokens += t.input_tokens
+            row.output_tokens += t.output_tokens
+        return sorted(groups.values(), key=lambda r: r.input_tokens + r.output_tokens, reverse=True)
+
+    total = rows(lambda t: "all")
+    return Usage(
+        by_provider=rows(lambda t: t.provider),
+        by_repo=rows(lambda t: f"{t.repo_owner}/{t.repo_name}"),
+        total=total[0]
+        if total
+        else UsageRow(key="all", tasks=0, cost_usd=0, input_tokens=0, output_tokens=0),
+    )
+
+
+class PreviewRequest(BaseModel):
+    port: int = Field(ge=1, le=65535)
+
+
+class PreviewLink(BaseModel):
+    url: str
+
+
+@router.post("/tasks/{task_id}/preview")
+def preview(task_id: str, body: PreviewRequest, user: UserDep, manager: ManagerDep) -> PreviewLink:
+    """A short-lived link that opens the task's dev server on the preview origin."""
+    task = _own_task(manager, task_id, user)
+    if not manager.settings.preview_url:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "Previews are off. Set ZIMUA_PREVIEW_URL on the server."
+        )
+    _workspace(manager, task)
+    return PreviewLink(url=preview_link(manager.settings, user.id or 0, task_id, body.port))

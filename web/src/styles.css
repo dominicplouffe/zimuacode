@@ -986,3 +986,64 @@ button.status-item:hover {
   border: 1px solid var(--descriptionForeground, #9d9d9d);
   font-size: 11px;
 }
+
+/* Bottom panel (terminal) */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--panel-background, #181818);
+  border-top: 1px solid var(--panel-border, #2b2b2b);
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-transform: none;
+}
+.terminal {
+  flex: 1;
+  min-height: 0;
+  padding: 0 0 4px 12px;
+}
+.terminal-banner {
+  padding: 4px 12px;
+  color: var(--descriptionForeground, #9d9d9d);
+}
+.separator.horizontal {
+  width: auto;
+  height: 1px;
+}
+
+.mono {
+  font-family: ui-monospace, monospace;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--panel-border, #2b2b2b);
+  text-align: right;
+}
+.table th[scope='row'],
+.table thead th:first-child {
+  text-align: left;
+}
+.terminal,
+.terminal .xterm,
+.terminal .xterm-viewport {
+  background-color: var(--panel-background, #181818) !important;
+}

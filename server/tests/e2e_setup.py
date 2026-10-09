@@ -24,6 +24,8 @@ def main(root: Path) -> None:
         git("init", "-q", "-b", "main")
         git("add", ".")
         git("-c", "user.name=e2e", "-c", "user.email=e2e@test", "commit", "-qm", "init")
+        # Branches the fake GitHub also knows, so tasks can work on them.
+        git("branch", "feature/legacy")
         bare = root / "octo" / "shop.git"
         bare.parent.mkdir(parents=True, exist_ok=True)
         git("clone", "-q", "--bare", str(src), str(bare), cwd=root)
