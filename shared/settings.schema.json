@@ -7,7 +7,7 @@
     "workbench.theme": {
       "type": "string",
       "default": "dark",
-      "description": "Color theme id. Built in: dark, light, high-contrast. Add more by dropping a VS Code theme JSON into shared/themes/."
+      "description": "Color theme id. Built in: dark, light, high-contrast, solarized-dark, solarized-light, monokai, github-dark, nord. Add more by dropping a VS Code theme JSON into shared/themes/."
     },
     "editor.fontSize": {
       "type": "integer",

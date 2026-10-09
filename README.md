@@ -128,7 +128,7 @@ Open them with **⌘,** (Ctrl+, on Windows and Linux), the gear icon, or "Prefer
 
 | Key | Default |
 | --- | --- |
-| `workbench.theme` | `"dark"` (also `light`, `high-contrast`) |
+| `workbench.theme` | `"dark"` (also `light`, `high-contrast`, `solarized-dark`, `solarized-light`, `monokai`, `github-dark`, `nord`) |
 | `editor.fontSize` | `14` |
 | `editor.fontFamily` | system monospace |
 | `editor.tabSize` | `4` |
