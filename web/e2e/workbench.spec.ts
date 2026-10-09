@@ -71,7 +71,7 @@ test('changes theme from the command palette and persists it', async ({ page }) 
   await page.keyboard.press(`${mod}+Shift+p`)
   await page.getByPlaceholder('Type a command').fill('color theme')
   await page.keyboard.press('Enter')
-  await page.getByRole('option', { name: 'Light' }).click()
+  await page.getByRole('option', { name: 'Light', exact: true }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme-type', 'light')
 
   await page.reload()
