@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -27,6 +28,19 @@ class Settings(BaseSettings):
     shared_dir: Path = REPO_ROOT / "shared"
     # Built web app to serve at "/". Unset in development, where Vite serves it.
     web_dist: Path | None = None
+
+    # Where task workspaces and agent logs live. With the docker sandbox it must be the same
+    # path on the host and inside the server container (bind-mounted at the same location).
+    data_dir: Path = Path("./data")
+    # "docker": one container per task (isolated). "local": plain processes on this machine,
+    # with no isolation; for development, or a VM dedicated to the agents.
+    sandbox: Literal["local", "docker"] = "local"
+    runner_image: str = "zimua-runner:latest"
+    # Agent CLI commands. Overridable for tests (a fake agent) or custom installs.
+    claude_bin: str = "claude"
+    codex_bin: str = "codex"
+    # Where task workspaces clone from. {owner} and {name} are filled in.
+    git_url_template: str = "https://github.com/{owner}/{name}.git"
 
     # Enables POST /api/auth/dev-login. Only for local development and end-to-end tests.
     dev_login: bool = False

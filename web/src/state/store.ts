@@ -19,8 +19,12 @@ export type Tab =
   | { id: string; kind: 'pr'; number: number }
   | { id: 'newPr'; kind: 'newPr' }
   | { id: string; kind: 'log'; jobId: number; title: string }
+  | { id: string; kind: 'task'; taskId: string }
+  | { id: 'newTask'; kind: 'newTask' }
+  | { id: string; kind: 'taskDiff'; taskId: string; path: string }
+  | { id: 'accounts'; kind: 'accounts' }
 
-export type SidebarView = 'explorer' | 'scm' | 'pulls'
+export type SidebarView = 'explorer' | 'scm' | 'pulls' | 'tasks'
 export type Palette =
   | 'files'
   | 'commands'
@@ -93,8 +97,8 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   },
   openRepo: (repo) => {
     saveLastRepo(repo)
-    // Everything except settings belongs to the previous repo.
-    const tabs = get().tabs.filter((t) => t.kind === 'settings')
+    // Settings, accounts and agent tasks aren't tied to the repo being browsed.
+    const tabs = get().tabs.filter((t) => ['settings', 'accounts', 'task', 'taskDiff'].includes(t.kind))
     set({ repo, tabs, activeTab: tabs[0]?.id ?? null })
   },
   setRef: (ref) => {

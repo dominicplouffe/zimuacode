@@ -105,3 +105,23 @@ export function withSetting(raw: string, key: string, value: unknown): string {
   }
   return JSON.stringify({ ...current, [key]: value }, null, 2)
 }
+
+export const useProviders = () => useQuery({ queryKey: ['providers'], queryFn: api.providers })
+
+export const useTasks = (repo: RepoRef | null) =>
+  useQuery({
+    queryKey: ['tasks', repo?.owner, repo?.name],
+    queryFn: () => api.tasks(repo?.owner, repo?.name),
+    // Keep the list (and the activity bar badge) current while agents are working.
+    refetchInterval: (query) =>
+      query.state.data?.some((t) => t.status === 'running' || t.status === 'preparing') ? 5_000 : 30_000,
+  })
+
+export const useTask = (id: string) =>
+  useQuery({ queryKey: ['task', id], queryFn: () => api.task(id) })
+
+export const useTaskChanges = (id: string, enabled: boolean) =>
+  useQuery({ queryKey: ['taskChanges', id], queryFn: () => api.taskChanges(id), enabled })
+
+export const useTaskFile = (id: string, path: string, side: 'base' | 'working') =>
+  useQuery({ queryKey: ['taskFile', id, side, path], queryFn: () => api.taskFile(id, path, side) })

@@ -2,16 +2,15 @@
 
 A web IDE, similar to VS Code, for working with Claude Code and Codex on your GitHub repos. It runs in the browser or as an Electron app, both talking to one server you host.
 
-**Status:** Phases 1–2 of 5 (see [Roadmap](#roadmap)). You can sign in with GitHub, browse any repo and branch, edit and commit files, review and merge pull requests, read CI logs, and change settings and themes. Agent tasks start in Phase 3.
+**Status:** Phases 1–3 of 5 (see [Roadmap](#roadmap)). You can sign in with GitHub, browse any repo and branch, edit and commit files, review and merge pull requests, read CI logs, change settings and themes, and run Claude Code tasks on your server that keep going with your laptop off.
 
 ## How it fits together
 
 ```
 browser / Electron ──► server (FastAPI) ──► GitHub API
                           │
-                          └─► (Phase 3+) one Docker container per agent task,
-                              running the official `claude` / `codex` CLIs
-                              logged in with your subscriptions
+                          └─► one Docker container per agent task, running the
+                              official `claude` / `codex` CLIs with your subscription
 ```
 
 - `server/`: Python 3.12, FastAPI, SQLite. Handles GitHub OAuth (single user), the GitHub API, settings and themes. In production it also serves the built web app.
@@ -64,8 +63,10 @@ To run all of these in GitHub Actions, copy `deploy/github-ci.yml` to `.github/w
    ```sh
    cd deploy
    cp .env.example .env    # then fill it in
+   sudo mkdir -p /srv/zimua && sudo chown 1000:1000 /srv/zimua
    docker compose up -d --build
    ```
+   This also builds `zimua-runner:latest`, the image agent tasks run in.
 
 ## Desktop app
 
@@ -76,6 +77,23 @@ ZIMUA_SERVER_URL=https://ide.example.com npm start
 ```
 
 You can also save `{"serverUrl": "https://ide.example.com"}` to `config.json` in the app's user-data folder instead of setting the variable.
+
+## Agent tasks
+
+Open **Agent Tasks** in the activity bar (or "Agent: New Task…" in the command palette), describe the work and start. Each task:
+
+- clones the repo into its own workspace on the server, on a new branch `zimua/<summary>-<id>`;
+- runs the agent CLI there, streaming its transcript (messages, tool calls, results, cost) to the IDE live;
+- takes follow-ups (queued if the agent is still working) and can be interrupted;
+- shows its changed files with live diffs, and publishes them as a pull request (or pushes to its existing one).
+
+Turns run detached from the server and write to a log on disk, so a task keeps going when you close the browser, and the server picks it back up after a restart.
+
+**Signing in an agent:** open "Agent: Accounts". For Claude Code, run `claude setup-token` on your computer and paste the token; it uses your Pro/Max subscription. An Anthropic API key also works. Credentials are stored encrypted on the server and only passed to the CLI.
+
+**Sandboxes** (`ZIMUA_SANDBOX`):
+- `docker` (the Compose default): one container per task from `runner-image/`, as a non-root user. The agent runs with permission prompts off, because the container is the boundary. Your GitHub token never enters the container; the server does the git clone and push itself.
+- `local` (the development default): the agent runs as a plain process on the server machine with permission prompts off. Use it only on a machine dedicated to this.
 
 ## Settings
 
@@ -109,7 +127,7 @@ To add a theme, drop a VS Code color theme JSON into `shared/themes/`.
 
 1. **Skeleton** ✅: GitHub sign-in, repo and branch browsing, editor, quick open, command palette, settings, themes, Electron shell, deploy files.
 2. **Git** ✅: branches (switch, create, delete), editing with a per-branch working copy, atomic commits (to the branch or a new one), PR list and PR view (description, checks, files and diffs, conversation, comments, merge), CI logs, PR and CI status in the status bar.
-3. **Agent runner and Claude Code**: per-task containers running `claude -p --output-format stream-json` with your subscription login, a live task panel, follow-ups and interrupt, a live file view, diff review, then a PR.
+3. **Agent runner and Claude Code** ✅: per-task workspaces and containers running `claude -p --output-format stream-json` with your subscription token, a live transcript, queued follow-ups, interrupt, changed files with live diffs, publish to a PR, recovery after server restarts.
 4. **Codex and cloud dispatch**: `codex exec --json` in the runner. Hand-off to Claude Code on the web (`claude --cloud`) and Codex Cloud, with reduced visibility because neither has a public API.
 5. **Extras**: push notifications, preview URLs for dev servers, a terminal, per-repo secrets and setup scripts, a usage view, and "Fix CI".
 

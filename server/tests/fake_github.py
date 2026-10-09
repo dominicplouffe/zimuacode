@@ -325,7 +325,9 @@ def list_pulls(owner: str, name: str, state: str = "open", head: str | None = No
 async def create_pull(owner: str, name: str, request: Request) -> dict[str, Any]:
     body = await request.json()
     if body["head"] not in branches:
-        raise HTTPException(422, "Validation Failed")
+        # Pushed with git (e.g. by an agent task), which this fake doesn't see: track it
+        # as a copy of the base.
+        branches[body["head"]] = _commit(commits[branches[body["base"]]]["files"])
     return _create_pull(
         body["title"], body["head"], body["base"], body.get("body", ""), body.get("draft", False)
     )

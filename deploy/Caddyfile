@@ -1,4 +1,7 @@
 {$ZIMUA_DOMAIN} {
 	encode zstd gzip
-	reverse_proxy server:8000
+	reverse_proxy server:8000 {
+		# Agent transcripts stream as server-sent events; send each one immediately.
+		flush_interval -1
+	}
 }

@@ -5,12 +5,17 @@ import { SettingsEditor } from '../editor/SettingsEditor'
 import { MOD } from '../commands/commands'
 import { CreatePullRequest } from '../pulls/CreatePullRequest'
 import { PullRequestView } from '../pulls/PullRequestView'
+import { Accounts } from '../tasks/Accounts'
+import { NewTask } from '../tasks/NewTask'
+import { TaskDiffView } from '../tasks/TaskDiffView'
+import { TaskView } from '../tasks/TaskView'
+import { useTask } from '../api/hooks'
 import { useWorkbench, type Tab } from '../state/store'
 import { branchKey, useWorkingCopy } from '../state/workingCopy'
 
 const basename = (path: string) => path.split('/').pop()!
 
-export function tabTitle(tab: Tab): string {
+export function tabTitle(tab: Tab, taskTitle?: string): string {
   switch (tab.kind) {
     case 'file':
       return basename(tab.path)
@@ -26,13 +31,34 @@ export function tabTitle(tab: Tab): string {
       return 'New pull request'
     case 'log':
       return `Log: ${tab.title}`
+    case 'task': {
+      const title = taskTitle ?? 'Task'
+      return title.length > 28 ? title.slice(0, 27) + '…' : title
+    }
+    case 'newTask':
+      return 'New task'
+    case 'taskDiff':
+      return `${basename(tab.path)} (agent)`
+    case 'accounts':
+      return 'Agent accounts'
   }
 }
 
 function tabTooltip(tab: Tab): string {
-  if (tab.kind === 'file' || tab.kind === 'workingDiff') return tab.path
+  if (tab.kind === 'file' || tab.kind === 'workingDiff' || tab.kind === 'taskDiff') return tab.path
   if (tab.kind === 'diff') return tab.head?.path ?? tab.base?.path ?? tab.title
   return tabTitle(tab)
+}
+
+function TaskTabLabel({ taskId }: { taskId: string }) {
+  const task = useTask(taskId)
+  const status = task.data?.status
+  return (
+    <>
+      {status && <span className={`dot status-${status}`} />}
+      <span>{tabTitle({ id: taskId, kind: 'task', taskId }, task.data?.title)}</span>
+    </>
+  )
 }
 
 export function EditorArea({ monacoTheme }: { monacoTheme: string }) {
@@ -57,7 +83,7 @@ export function EditorArea({ monacoTheme }: { monacoTheme: string }) {
                 onClick={() => setActiveTab(tab.id)}
                 onAuxClick={(e) => e.button === 1 && closeTab(tab.id)}
               >
-                <span>{title}</span>
+                {tab.kind === 'task' ? <TaskTabLabel taskId={tab.taskId} /> : <span>{title}</span>}
                 {dirty && (
                   <span className="tab-dirty" aria-label="modified">
                     ●
@@ -88,6 +114,12 @@ export function EditorArea({ monacoTheme }: { monacoTheme: string }) {
         {active?.kind === 'pr' && <PullRequestView key={active.id} number={active.number} />}
         {active?.kind === 'newPr' && <CreatePullRequest />}
         {active?.kind === 'log' && <LogView key={active.id} jobId={active.jobId} theme={monacoTheme} />}
+        {active?.kind === 'task' && <TaskView key={active.id} taskId={active.taskId} />}
+        {active?.kind === 'newTask' && <NewTask />}
+        {active?.kind === 'accounts' && <Accounts />}
+        {active?.kind === 'taskDiff' && (
+          <TaskDiffView key={active.id} taskId={active.taskId} path={active.path} theme={monacoTheme} />
+        )}
         {!active && (
           <div className="welcome">
             <h1>Zimua Code</h1>

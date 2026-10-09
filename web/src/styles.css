@@ -792,3 +792,190 @@ button.status-item:hover {
 .toast .tab-close {
   visibility: visible;
 }
+
+/* Agent tasks */
+
+.dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--descriptionForeground, #9d9d9d);
+}
+.dot.status-running,
+.dot.status-preparing {
+  background: var(--testing-iconQueued, #cca700);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+.dot.status-idle {
+  background: var(--testing-iconPassed, #73c991);
+}
+.dot.status-failed {
+  background: var(--testing-iconFailed, #f14c4c);
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dot.status-running,
+  .dot.status-preparing {
+    animation: none;
+  }
+}
+
+.task-status {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #6e7681;
+}
+.task-status.status-running,
+.task-status.status-preparing {
+  background: #9e6a03;
+}
+.task-status.status-idle {
+  background: #238636;
+}
+.task-status.status-failed {
+  background: #da3633;
+}
+
+.task-view {
+  display: flex;
+  height: 100%;
+  color: var(--editor-foreground, #d4d4d4);
+}
+.task-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+.task-header {
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid var(--panel-border, #2b2b2b);
+}
+.task-header h1 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 500;
+}
+.transcript {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 20px;
+}
+.composer {
+  padding: 10px 20px 14px;
+  border-top: 1px solid var(--panel-border, #2b2b2b);
+}
+.task-side {
+  width: 280px;
+  flex-shrink: 0;
+  overflow: auto;
+  border-left: 1px solid var(--panel-border, #2b2b2b);
+  background: var(--sideBar-background, #181818);
+}
+.task-publish {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.task-archive {
+  padding: 4px 12px 12px;
+}
+@media (max-width: 800px) {
+  .task-view {
+    flex-direction: column;
+  }
+  .task-side {
+    width: auto;
+    max-height: 40%;
+    border-left: none;
+    border-top: 1px solid var(--panel-border, #2b2b2b);
+  }
+}
+
+.msg {
+  margin: 8px 0;
+  max-width: 860px;
+}
+.msg-user {
+  margin-left: auto;
+  width: fit-content;
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--list-activeSelectionBackground, #04395e);
+  color: var(--list-activeSelectionForeground, #fff);
+}
+.msg-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg-note {
+  font-size: 11px;
+  opacity: 0.8;
+}
+.msg-thinking,
+.msg-log {
+  color: var(--descriptionForeground, #9d9d9d);
+}
+.msg summary {
+  cursor: pointer;
+}
+.msg-tool {
+  padding: 4px 8px;
+  border-left: 2px solid var(--panel-border, #3c3c3c);
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.msg-tool.is-error {
+  border-left-color: var(--testing-iconFailed, #f14c4c);
+}
+.msg-tool .tool-name {
+  color: var(--editor-foreground, #d4d4d4);
+}
+.msg pre {
+  max-height: 320px;
+  overflow: auto;
+  margin: 6px 0;
+  padding: 8px;
+  background: var(--textCodeBlock-background, #2b2b2b);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.msg .tool-input {
+  opacity: 0.8;
+}
+.subagent {
+  margin-left: 16px;
+  opacity: 0.8;
+}
+.msg-error {
+  padding: 8px 12px;
+  border-left: 3px solid var(--testing-iconFailed, #f14c4c);
+  background: var(--textCodeBlock-background, #2b2b2b);
+}
+.msg-status {
+  margin: 10px 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--descriptionForeground, #9d9d9d);
+}
+.msg-status.status-failed {
+  color: var(--testing-iconFailed, #f14c4c);
+}
+.msg-todo {
+  list-style: none;
+  padding-left: 8px;
+}
+.msg-todo .done {
+  opacity: 0.6;
+  text-decoration: line-through;
+}

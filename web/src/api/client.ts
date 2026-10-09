@@ -17,6 +17,20 @@ export type Check = Schemas['Check']
 export type FileChange = Schemas['FileChange']
 export type CommitResult = Schemas['CommitResult']
 export type MergeMethod = Schemas['MergeRequest']['method']
+export type Provider = Schemas['Provider']
+export type TaskSummary = Schemas['TaskSummary']
+export type TaskChange = Schemas['TaskChange']
+export type TaskFile = Schemas['TaskFile']
+export type PublishResult = Schemas['PublishResult']
+export type NewTask = Schemas['NewTask']
+
+/** One transcript event, as streamed from /api/tasks/{id}/events. */
+export interface TaskEvent {
+  seq: number
+  type: string
+  data: Record<string, unknown>
+  created_at: string
+}
 
 export class ApiError extends Error {
   constructor(
@@ -107,6 +121,26 @@ export const api = {
     request<Check[]>('GET', `${repoPath(owner, name)}/checks?ref=${encodeURIComponent(ref)}`),
   checkLogs: async (owner: string, name: string, jobId: number) =>
     (await send('GET', `${repoPath(owner, name)}/checks/${jobId}/logs`)).text(),
+  providers: () => request<Provider[]>('GET', '/api/providers'),
+  setCredential: (provider: string, value: string) =>
+    request<void>('PUT', `/api/providers/${encodeURIComponent(provider)}/credential`, { value }),
+  deleteCredential: (provider: string) =>
+    request<void>('DELETE', `/api/providers/${encodeURIComponent(provider)}/credential`),
+  tasks: (owner?: string, name?: string) =>
+    request<TaskSummary[]>(
+      'GET',
+      owner && name ? `/api/tasks?owner=${encodeURIComponent(owner)}&name=${encodeURIComponent(name)}` : '/api/tasks',
+    ),
+  createTask: (body: NewTask) => request<TaskSummary>('POST', '/api/tasks', body),
+  task: (id: string) => request<TaskSummary>('GET', `/api/tasks/${id}`),
+  sendMessage: (id: string, text: string) => request<TaskSummary>('POST', `/api/tasks/${id}/messages`, { text }),
+  interrupt: (id: string) => request<TaskSummary>('POST', `/api/tasks/${id}/interrupt`),
+  archiveTask: (id: string) => request<void>('DELETE', `/api/tasks/${id}`),
+  taskChanges: (id: string) => request<TaskChange[]>('GET', `/api/tasks/${id}/changes`),
+  taskFile: (id: string, path: string, side: 'base' | 'working') =>
+    request<TaskFile>('GET', `/api/tasks/${id}/file?path=${encodeURIComponent(path)}&side=${side}`),
+  publishTask: (id: string, body: { title: string; body: string; draft: boolean }) =>
+    request<PublishResult>('POST', `/api/tasks/${id}/publish`, body),
   settings: () => request<UserSettings>('GET', '/api/settings'),
   saveSettings: (raw: string) => request<UserSettings>('PUT', '/api/settings', { raw }),
   themes: () => request<Theme[]>('GET', '/api/themes'),

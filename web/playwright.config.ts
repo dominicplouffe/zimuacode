@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test'
+import path from 'node:path'
 
 const PORT = 8765
 const FAKE_GITHUB_PORT = 9001
@@ -21,7 +22,7 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: `rm -rf .e2e-data && uv run uvicorn app.main:app --port ${PORT}`,
+      command: `rm -rf .e2e-data && uv run python -m tests.e2e_setup .e2e-data/git && uv run uvicorn app.main:app --port ${PORT}`,
       cwd: '../server',
       port: PORT,
       reuseExistingServer: false,
@@ -32,6 +33,9 @@ export default defineConfig({
         ZIMUA_PUBLIC_URL: `http://localhost:${PORT}`,
         ZIMUA_DEV_LOGIN: '1',
         ZIMUA_WEB_DIST: '../web/dist',
+        ZIMUA_DATA_DIR: './.e2e-data',
+        ZIMUA_GIT_URL_TEMPLATE: `file://${path.resolve('../server/.e2e-data/git')}/{owner}/{name}.git`,
+        ZIMUA_CLAUDE_BIN: `python3 ${path.resolve('../server/tests/fake_agent.py')}`,
       },
     },
   ],

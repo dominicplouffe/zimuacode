@@ -6,9 +6,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, commits, pulls, repos, settings
+from app.api import auth, commits, pulls, repos, settings, tasks
 from app.config import DEV_SECRET_KEY, get_settings
 from app.db import init_db
+from app.tasks.events import EventBus
+from app.tasks.manager import TaskManager
+from app.tasks.sandbox import make_sandbox
 
 
 @asynccontextmanager
@@ -17,9 +20,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.cookie_secure and settings.secret_key == DEV_SECRET_KEY:
         raise RuntimeError("Set ZIMUA_SECRET_KEY before running in production")
     init_db()
+    manager = TaskManager(settings, EventBus(), make_sandbox(settings))
+    app.state.tasks = manager
+    await manager.recover()
     async with httpx.AsyncClient(timeout=30) as http:
         app.state.http = http
-        yield
+        try:
+            yield
+        finally:
+            await manager.shutdown()
 
 
 def create_app() -> FastAPI:
@@ -29,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(settings.router)
     app.include_router(commits.router)
     app.include_router(pulls.router)
+    app.include_router(tasks.router)
 
     @app.get("/api/health", tags=["meta"])
     def health() -> dict[str, str]:

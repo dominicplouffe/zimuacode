@@ -6,6 +6,7 @@ import { monaco } from '../editor/monaco'
 import { Explorer } from '../panels/Explorer'
 import { PullRequests } from '../panels/PullRequests'
 import { SourceControl } from '../panels/SourceControl'
+import { Tasks } from '../panels/Tasks'
 import { useWorkbench } from '../state/store'
 import { monacoThemeId, themeCssVars, toMonacoTheme } from '../theme/theme'
 import { ActivityBar } from './ActivityBar'
@@ -79,6 +80,7 @@ export function Workbench() {
                 {sidebar === 'explorer' && <Explorer />}
                 {sidebar === 'scm' && <SourceControl />}
                 {sidebar === 'pulls' && <PullRequests />}
+                {sidebar === 'tasks' && <Tasks />}
               </Panel>
               <Separator className="separator" />
             </>
