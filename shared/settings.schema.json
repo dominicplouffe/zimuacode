@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Zimua Code settings",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "workbench.theme": {
+      "type": "string",
+      "default": "dark",
+      "description": "Color theme id. Built in: dark, light, high-contrast. Add more by dropping a VS Code theme JSON into shared/themes/."
+    },
+    "editor.fontSize": {
+      "type": "integer",
+      "minimum": 8,
+      "maximum": 40,
+      "default": 14,
+      "description": "Editor font size in pixels."
+    },
+    "editor.fontFamily": {
+      "type": "string",
+      "default": "ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace",
+      "description": "Editor font family."
+    },
+    "editor.tabSize": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8,
+      "default": 4,
+      "description": "Spaces per indentation level."
+    },
+    "editor.wordWrap": {
+      "type": "string",
+      "enum": ["off", "on"],
+      "default": "off",
+      "description": "Wrap long lines."
+    },
+    "editor.minimap": {
+      "type": "boolean",
+      "default": false,
+      "description": "Show the minimap."
+    },
+    "files.autoSave": {
+      "type": "string",
+      "enum": ["off", "afterDelay", "onFocusChange"],
+      "default": "off",
+      "description": "When edited files are saved."
+    },
+    "ai.defaultProvider": {
+      "type": "string",
+      "enum": ["claude-code", "codex"],
+      "default": "claude-code",
+      "description": "Agent used for new tasks."
+    },
+    "ai.defaultModel": {
+      "type": "string",
+      "default": "",
+      "description": "Model for new tasks. Empty uses the provider's own default."
+    },
+    "notifications.enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "Send push notifications when tasks finish or need input."
+    }
+  }
+}

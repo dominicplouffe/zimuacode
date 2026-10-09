@@ -1,0 +1,30 @@
+# Single-VM deployment: Caddy terminates TLS and proxies to the Zimua server.
+# Usage: cp .env.example .env, fill it in, then `docker compose up -d --build`.
+services:
+  server:
+    build:
+      context: ..
+    env_file: .env
+    environment:
+      ZIMUA_PUBLIC_URL: https://${ZIMUA_DOMAIN}
+    volumes:
+      - zimua-data:/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ZIMUA_DOMAIN: ${ZIMUA_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - server
+    restart: unless-stopped
+
+volumes:
+  zimua-data:
+  caddy-data:
