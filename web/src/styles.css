@@ -979,3 +979,10 @@ button.status-item:hover {
   opacity: 0.6;
   text-decoration: line-through;
 }
+
+.tag {
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--descriptionForeground, #9d9d9d);
+  font-size: 11px;
+}

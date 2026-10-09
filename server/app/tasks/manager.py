@@ -13,11 +13,11 @@ from sqlmodel import Session, select
 
 from app.config import Settings
 from app.db import get_engine
-from app.models import ProviderCredential, Task
+from app.models import ProviderCredential, Task, User
 from app.security import decrypt
 from app.tasks import git
 from app.tasks.events import EventBus
-from app.tasks.providers import PROVIDERS, AgentProvider
+from app.tasks.providers import PROVIDERS, AgentProvider, TurnContext
 from app.tasks.sandbox import Sandbox, task_dir, write_turn_script
 
 log = logging.getLogger(__name__)
@@ -43,6 +43,14 @@ def slugify(text: str, limit: int = 32) -> str:
 def title_from_prompt(prompt: str) -> str:
     first = prompt.strip().splitlines()[0] if prompt.strip() else "Task"
     return first if len(first) <= 80 else first[:79] + "…"
+
+
+def user_settings(user_id: int) -> dict[str, Any]:
+    from app.api.settings import effective
+
+    with Session(get_engine()) as s:
+        user = s.get(User, user_id)
+        return effective(user.settings_json if user else "{}")
 
 
 def credential_for(user_id: int, provider: str) -> str | None:
@@ -153,9 +161,7 @@ class TaskManager:
             self.update(task_id, base_sha=base_sha)
             self.set_status(task_id, "preparing", "Starting agent")
             await self.sandbox.prepare(task_id)
-            home = self.root(task_id) / "home"
-            home.mkdir(parents=True, exist_ok=True)
-            self.provider(task).setup_home(home, credential_for(task.user_id, task.provider))
+            (self.root(task_id) / "home").mkdir(parents=True, exist_ok=True)
         except Exception as e:
             log.exception("preparing task %s failed", task_id)
             self.bus.publish(task_id, "error", {"message": f"Couldn't prepare workspace: {e}"})
@@ -174,18 +180,24 @@ class TaskManager:
         )
         self.bus.publish(task_id, "status", {"status": "running", "detail": None})
         provider = self.provider(task)
-        argv = provider.command(
-            self.settings,
-            model=task.model,
-            session_id=task.session_id,
+        ctx = TurnContext(
+            settings=self.settings,
+            task=task,
             first_turn=task.turn == 1,
-            branch=task.branch,
-        )
-        env = provider.env(credential_for(task.user_id, task.provider))
-        write_turn_script(
-            self.root(task_id), task.turn, argv, env, prompt, self.sandbox.home(task_id)
+            user_settings=user_settings(task.user_id),
+            credential=credential_for(task.user_id, provider.info.credential_key),
+            home=self.root(task_id) / "home",
         )
         try:
+            provider.setup_home(ctx)
+            write_turn_script(
+                self.root(task_id),
+                task.turn,
+                provider.command(ctx),
+                provider.env(ctx),
+                provider.prompt(ctx, prompt),
+                self.sandbox.home(task_id),
+            )
             await self.sandbox.launch(task_id, task.turn)
         except Exception as e:
             log.exception("launching task %s failed", task_id)
@@ -301,6 +313,8 @@ class TaskManager:
             self.bus.publish(task_id, "user_message", {"text": text, "queued": True})
             return
         self.bus.publish(task_id, "user_message", {"text": text})
+        # Running from this moment, so nobody sees a stale "idle" before the turn starts.
+        self.update(task_id, status="running", status_detail=None)
         self._spawn(task_id, self._start_turn(task_id, text))
 
     async def interrupt(self, task_id: str) -> None:

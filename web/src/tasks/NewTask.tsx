@@ -84,6 +84,7 @@ export function NewTask() {
             {providers.data?.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
+                {p.experimental ? ' — experimental' : ''}
                 {p.configured ? '' : ' (not signed in)'}
               </option>
             ))}
@@ -108,6 +109,12 @@ export function NewTask() {
           </select>
         </label>
       </div>
+      {info?.capabilities.runs_on === 'vendor' && (
+        <p className="muted">
+          {info.name} runs the task on the vendor's own servers. You get a link to follow it there; the transcript doesn't
+          stream here. {info.credential_help}
+        </p>
+      )}
       {info && !info.configured && (
         <p className="muted">
           {info.name} isn't signed in, so the task will likely fail.{' '}

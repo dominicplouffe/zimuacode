@@ -36,7 +36,7 @@ class SaveSettings(BaseModel):
     raw: str
 
 
-def _effective(raw: str) -> dict[str, Any]:
+def effective(raw: str) -> dict[str, Any]:
     try:
         user = json.loads(raw)
     except json.JSONDecodeError:
@@ -45,7 +45,7 @@ def _effective(raw: str) -> dict[str, Any]:
 
 
 def _response(raw: str) -> UserSettings:
-    return UserSettings(raw=raw, effective=_effective(raw), json_schema=_schema())
+    return UserSettings(raw=raw, effective=effective(raw), json_schema=_schema())
 
 
 @router.get("/settings")

@@ -15,6 +15,7 @@ from app.config import get_settings
 from app.tasks.providers import ClaudeParser
 
 FAKE_AGENT = Path(__file__).with_name("fake_agent.py")
+FAKE_CODEX = Path(__file__).with_name("fake_codex.py")
 
 
 def _git(cwd: Path, *args: str) -> str:
@@ -43,6 +44,7 @@ def runner_env(env: None, tmp_path: Path, remote: Path, monkeypatch: pytest.Monk
     monkeypatch.setenv("ZIMUA_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("ZIMUA_GIT_URL_TEMPLATE", f"file://{tmp_path}/git/{{owner}}/{{name}}.git")
     monkeypatch.setenv("ZIMUA_CLAUDE_BIN", f"{sys.executable} {FAKE_AGENT}")
+    monkeypatch.setenv("ZIMUA_CODEX_BIN", f"{sys.executable} {FAKE_CODEX}")
     get_settings.cache_clear()
 
 
@@ -74,10 +76,10 @@ def events(client: TestClient, task_id: str) -> list[dict[str, Any]]:
     return EventBus().history(task_id)
 
 
-def start(client: TestClient, prompt: str) -> str:
+def start(client: TestClient, prompt: str, provider: str = "claude-code") -> str:
     resp = client.post(
         "/api/tasks",
-        json={"provider": "claude-code", "owner": "octo", "name": "app",
+        json={"provider": provider, "owner": "octo", "name": "app",
               "base_branch": "main", "prompt": prompt},
     )  # fmt: skip
     assert resp.status_code == 201, resp.text

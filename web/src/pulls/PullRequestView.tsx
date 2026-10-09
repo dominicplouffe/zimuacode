@@ -6,6 +6,7 @@ import { api, type MergeMethod, type Pull, type PullFile } from '../api/client'
 import { useChecks, usePull, usePullFiles, usePullTimeline } from '../api/hooks'
 import { useWorkbench } from '../state/store'
 import { ChecksList } from './Checks'
+import { markdownComponents } from '../editor/markdown'
 
 const STATUS_LETTER: Record<string, string> = {
   added: 'A',
@@ -170,7 +171,7 @@ function Conversation({ pull }: { pull: Pull }) {
             </div>
             {item.body && (
               <div className="markdown">
-                <Markdown remarkPlugins={[remarkGfm]}>{item.body}</Markdown>
+                <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{item.body}</Markdown>
               </div>
             )}
           </li>
@@ -233,7 +234,7 @@ export function PullRequestView({ number }: { number: number }) {
       </header>
 
       <section className="pr-section markdown">
-        {p.body ? <Markdown remarkPlugins={[remarkGfm]}>{p.body}</Markdown> : <p className="muted">No description.</p>}
+        {p.body ? <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{p.body}</Markdown> : <p className="muted">No description.</p>}
       </section>
 
       <section className="pr-section">

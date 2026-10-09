@@ -30,7 +30,10 @@
     },
     "editor.wordWrap": {
       "type": "string",
-      "enum": ["off", "on"],
+      "enum": [
+        "off",
+        "on"
+      ],
       "default": "off",
       "description": "Wrap long lines."
     },
@@ -41,7 +44,12 @@
     },
     "ai.defaultProvider": {
       "type": "string",
-      "enum": ["claude-code", "codex"],
+      "enum": [
+        "claude-code",
+        "codex",
+        "claude-cloud",
+        "codex-cloud"
+      ],
       "default": "claude-code",
       "description": "Agent used for new tasks."
     },
@@ -49,6 +57,11 @@
       "type": "string",
       "default": "",
       "description": "Model for new tasks. Empty uses the provider's own default."
+    },
+    "ai.codexCloudEnvironment": {
+      "type": "string",
+      "default": "",
+      "description": "Codex Cloud environment id, for Codex Cloud hand-off tasks. Find it in your Codex Cloud environment settings."
     },
     "notifications.enabled": {
       "type": "boolean",

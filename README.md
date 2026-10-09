@@ -2,7 +2,7 @@
 
 A web IDE, similar to VS Code, for working with Claude Code and Codex on your GitHub repos. It runs in the browser or as an Electron app, both talking to one server you host.
 
-**Status:** Phases 1–3 of 5 (see [Roadmap](#roadmap)). You can sign in with GitHub, browse any repo and branch, edit and commit files, review and merge pull requests, read CI logs, change settings and themes, and run Claude Code tasks on your server that keep going with your laptop off.
+**Status:** Phases 1–4 of 5 (see [Roadmap](#roadmap)). You can sign in with GitHub, browse any repo and branch, edit and commit files, review and merge pull requests, read CI logs, change settings and themes, and run Claude Code or Codex tasks on your server that keep going with your laptop off (or hand them off to the vendors' clouds).
 
 ## How it fits together
 
@@ -89,7 +89,18 @@ Open **Agent Tasks** in the activity bar (or "Agent: New Task…" in the command
 
 Turns run detached from the server and write to a log on disk, so a task keeps going when you close the browser, and the server picks it back up after a restart.
 
-**Signing in an agent:** open "Agent: Accounts". For Claude Code, run `claude setup-token` on your computer and paste the token; it uses your Pro/Max subscription. An Anthropic API key also works. Credentials are stored encrypted on the server and only passed to the CLI.
+**Agents:**
+
+| Agent | Runs on | Sign in with |
+| --- | --- | --- |
+| Claude Code | your server | `claude setup-token` (Pro/Max subscription), or an Anthropic API key |
+| Codex | your server | the contents of `~/.codex/auth.json` after `codex login` (ChatGPT plan), or an OpenAI API key |
+| Claude Code on the web (hand-off, experimental) | Anthropic's cloud | the contents of `~/.claude/.credentials.json` after `claude auth login` on Linux |
+| Codex Cloud (hand-off, experimental) | OpenAI's cloud | the Codex login, plus `ai.codexCloudEnvironment` in settings.json |
+
+Open "Agent: Accounts" to save logins. They're stored encrypted on the server and only passed to the CLI.
+
+The hand-off agents exist because neither vendor has a public API for its cloud sessions. They use the official CLIs (`claude --cloud`, `codex cloud`), so you only get a link to follow the task on the vendor's site, not a live transcript. For Codex Cloud, sending a message fetches the finished diff into the workspace, so you can review it and open a PR from the IDE. These two depend on CLI behaviour that couldn't be tested end to end here, so treat them as experimental.
 
 **Sandboxes** (`ZIMUA_SANDBOX`):
 - `docker` (the Compose default): one container per task from `runner-image/`, as a non-root user. The agent runs with permission prompts off, because the container is the boundary. Your GitHub token never enters the container; the server does the git clone and push itself.
@@ -109,6 +120,7 @@ Open them with **⌘,** (Ctrl+, on Windows and Linux), the gear icon, or "Prefer
 | `editor.minimap` | `false` |
 | `ai.defaultProvider` | `"claude-code"` |
 | `ai.defaultModel` | `""` (the provider's default) |
+| `ai.codexCloudEnvironment` | `""` (needed for Codex Cloud hand-off) |
 | `notifications.enabled` | `true` |
 
 To add a theme, drop a VS Code color theme JSON into `shared/themes/`.
@@ -128,7 +140,7 @@ To add a theme, drop a VS Code color theme JSON into `shared/themes/`.
 1. **Skeleton** ✅: GitHub sign-in, repo and branch browsing, editor, quick open, command palette, settings, themes, Electron shell, deploy files.
 2. **Git** ✅: branches (switch, create, delete), editing with a per-branch working copy, atomic commits (to the branch or a new one), PR list and PR view (description, checks, files and diffs, conversation, comments, merge), CI logs, PR and CI status in the status bar.
 3. **Agent runner and Claude Code** ✅: per-task workspaces and containers running `claude -p --output-format stream-json` with your subscription token, a live transcript, queued follow-ups, interrupt, changed files with live diffs, publish to a PR, recovery after server restarts.
-4. **Codex and cloud dispatch**: `codex exec --json` in the runner. Hand-off to Claude Code on the web (`claude --cloud`) and Codex Cloud, with reduced visibility because neither has a public API.
+4. **Codex and cloud hand-off** ✅: Codex (`codex exec --json`, resumable) in the runner; experimental hand-off to Claude Code on the web (`claude --cloud`) and Codex Cloud (`codex cloud exec`, with the result fetched into the workspace).
 5. **Extras**: push notifications, preview URLs for dev servers, a terminal, per-repo secrets and setup scripts, a usage view, and "Fix CI".
 
 > Running the official CLIs with your own subscription is meant for your personal use. Anthropic doesn't allow third-party products to offer claude.ai login, so don't run this as a service for other people.

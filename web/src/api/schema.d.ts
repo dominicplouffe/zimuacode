@@ -736,6 +736,13 @@ export interface components {
             capabilities: components["schemas"]["Capabilities"];
             /** Credential Help */
             credential_help: string;
+            /** Credential Key */
+            credential_key: string;
+            /**
+             * Experimental
+             * @default false
+             */
+            experimental: boolean;
             /** Configured */
             configured: boolean;
         };

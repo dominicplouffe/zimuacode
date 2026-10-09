@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { api, type TaskEvent, type TaskSummary } from '../api/client'
-import { useTask, useTaskChanges } from '../api/hooks'
+import { useProviders, useTask, useTaskChanges } from '../api/hooks'
+import { markdownComponents } from '../editor/markdown'
 import { useWorkbench } from '../state/store'
 import { buildTranscript, summarizeTool, type Entry } from './transcript'
 import { useTaskEvents } from './useTaskEvents'
@@ -37,7 +38,9 @@ function EventView({ event }: { event: TaskEvent }) {
     case 'assistant_text':
       return (
         <div className={`msg msg-assistant markdown${event.data.subagent ? ' subagent' : ''}`}>
-          <Markdown remarkPlugins={[remarkGfm]}>{text(event)}</Markdown>
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {text(event)}
+          </Markdown>
         </div>
       )
     case 'thinking':
@@ -102,6 +105,8 @@ function EventView({ event }: { event: TaskEvent }) {
           {String(event.data.message ?? 'Error')}
         </div>
       )
+    case 'link':
+      return null
     case 'pr':
       return (
         <div className="msg-status">
@@ -140,6 +145,8 @@ function EntryView({ entry }: { entry: Entry }) {
 
 function Composer({ task }: { task: TaskSummary }) {
   const queryClient = useQueryClient()
+  const provider = useProviders().data?.find((p) => p.id === task.provider)
+  const canInterrupt = provider?.capabilities.interrupt ?? true
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const working = task.status === 'running' || task.status === 'preparing'
@@ -180,7 +187,7 @@ function Composer({ task }: { task: TaskSummary }) {
       />
       <div className="form-actions">
         {error && <span className="error">{error}</span>}
-        {task.status === 'running' && (
+        {task.status === 'running' && canInterrupt && (
           <button className="button secondary" onClick={interrupt}>
             Interrupt
           </button>

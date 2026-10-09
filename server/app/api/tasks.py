@@ -125,14 +125,15 @@ def list_providers(user: UserDep, db: DbDep) -> list[Provider]:
         for c in db.exec(select(ProviderCredential).where(ProviderCredential.user_id == user.id))
     }
     return [
-        Provider(**p.info.model_dump(), configured=p.info.id in configured)
+        Provider(**p.info.model_dump(), configured=p.info.credential_key in configured)
         for p in PROVIDERS.values()
     ]
 
 
+# {provider} is a provider's credential_key; providers sharing a login share one entry.
 @router.put("/providers/{provider}/credential", status_code=status.HTTP_204_NO_CONTENT)
 def set_credential(provider: str, body: Credential, user: UserDep, db: DbDep) -> None:
-    if provider not in PROVIDERS:
+    if provider not in {p.info.credential_key for p in PROVIDERS.values()}:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown provider")
     row = db.get(ProviderCredential, (user.id, provider)) or ProviderCredential(
         user_id=user.id or 0, provider=provider, value_enc=""
