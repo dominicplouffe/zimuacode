@@ -112,7 +112,7 @@ def test_bad_images_are_rejected(app_client: TestClient) -> None:
 def test_hand_off_agents_refuse_images(app_client: TestClient) -> None:
     resp = app_client.post(
         "/api/tasks",
-        json={"provider": "claude-cloud", "owner": "octo", "name": "app",
+        json={"provider": "codex-cloud", "owner": "octo", "name": "app",
               "base_branch": "main", "prompt": "x", "images": [b64(PNG)]},
     )  # fmt: skip
     assert resp.status_code == 422

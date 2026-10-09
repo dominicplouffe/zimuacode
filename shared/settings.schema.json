@@ -47,7 +47,6 @@
       "enum": [
         "claude-code",
         "codex",
-        "claude-cloud",
         "codex-cloud"
       ],
       "default": "claude-code",

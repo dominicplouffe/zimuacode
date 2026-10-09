@@ -170,6 +170,9 @@ class TaskManager:
         return self.root(task_id) / "attachments"
 
     def provider(self, task: Task) -> AgentProvider:
+        if task.provider not in PROVIDERS:
+            # Tasks from an agent that has since been removed.
+            raise TaskError("This task's agent is no longer available; start a new task")
         return PROVIDERS[task.provider]
 
     def _spawn(self, task_id: str, coro: Any) -> None:
@@ -439,8 +442,9 @@ class TaskManager:
             raise TaskError("This task is archived")
         if task.base_sha is None and task.status != "preparing":
             raise TaskError("The workspace was never set up; start a new task")
-        if images and not self.provider(task).info.capabilities.images:
-            raise TaskError(f"{self.provider(task).info.name} can't take images")
+        provider = self.provider(task)
+        if images and not provider.info.capabilities.images:
+            raise TaskError(f"{provider.info.name} can't take images")
         names = self._save_images(task_id, images)
         if task.status in ACTIVE:
             queued = {"text": text, "images": names}

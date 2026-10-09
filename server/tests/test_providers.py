@@ -210,21 +210,3 @@ def test_codex_cloud_needs_an_environment(app_client: TestClient) -> None:
         e["data"]["text"] for e in events(app_client, task_id) if e["type"] == "assistant_text"
     ]
     assert "ai.codexCloudEnvironment" in texts[0]
-
-
-def test_claude_cloud_hand_off(app_client: TestClient) -> None:
-    task_id = start(app_client, "Do it on the web", provider="claude-cloud")
-    task = wait_for(app_client, task_id, "idle", "failed")
-    assert task["status"] == "idle"
-    links = [e["data"]["url"] for e in events(app_client, task_id) if e["type"] == "link"]
-    assert links == ["https://claude.ai/code/session_FAKE42"]
-    app_client.post(f"/api/tasks/{task_id}/messages", json={"text": "and tests"})
-    time.sleep(0.5)
-    wait_for(app_client, task_id, "idle")
-    texts = [
-        e["data"]["text"] for e in events(app_client, task_id) if e["type"] == "assistant_text"
-    ]
-    assert (
-        texts[-1]
-        == "Sent to Claude Code on the web. [Open it](https://claude.ai/code/session_FAKE42)"
-    )

@@ -27,20 +27,6 @@ if "--input-format" in args:
     kinds = ",".join(b["source"]["media_type"] for b in content if b["type"] == "image")
     prompt = f"{text} [{kinds}]"
 
-# Hand-off to Claude Code on the web.
-if "--cloud" in args:
-    if "-p" in args:
-        target = args[args.index("--cloud") + 1]
-        print(
-            json.dumps(
-                {"ok": True, "session_id": target, "url": f"https://claude.ai/code/{target}"}
-            )
-        )
-    else:
-        print("Starting cloud session…")
-        print("https://claude.ai/code/session_FAKE42")
-    sys.exit(0)
-
 
 def emit(obj: dict) -> None:
     print(json.dumps({**obj, "session_id": session}), flush=True)

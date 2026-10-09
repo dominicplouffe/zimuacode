@@ -24,7 +24,10 @@ export function NewTask() {
   const prNumber = draft?.prNumber ?? null
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const chosen = provider ?? (settings?.['ai.defaultProvider'] as string | undefined) ?? 'claude-code'
+  const preferred = provider ?? (settings?.['ai.defaultProvider'] as string | undefined) ?? 'claude-code'
+  // A default naming a removed agent falls back to Claude Code.
+  const chosen =
+    providers.data && !providers.data.some((p) => p.id === preferred) ? 'claude-code' : preferred
   const info = providers.data?.find((p) => p.id === chosen)
   const pasted = usePastedImages(info?.capabilities.images ?? true)
 
