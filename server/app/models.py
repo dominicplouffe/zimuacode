@@ -67,7 +67,8 @@ class Task(SQLModel, table=True):
     log_offset: int = 0
     interrupt_requested: bool = False
     # Follow-ups sent while the agent was working; they run after the current turn.
-    pending: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    # Each is {"text", "images": [attachment names]}. Older rows hold bare text.
+    pending: list[Any] = Field(default_factory=list, sa_column=Column(JSON))
     cost_usd: float = 0
     input_tokens: int = 0
     output_tokens: int = 0

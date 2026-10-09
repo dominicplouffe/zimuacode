@@ -1,3 +1,4 @@
+import base64
 import json
 import time
 from pathlib import Path
@@ -14,7 +15,7 @@ from app.tasks.providers import (
     DispatchParser,
     TurnContext,
 )
-from tests.helpers import events, start, wait_for
+from tests.helpers import PNG, events, start, wait_for
 
 
 class FakeTask:
@@ -50,6 +51,34 @@ def test_codex_command_and_resume(tmp_path: Path) -> None:
     # The IDE's rules ride along with the first message only.
     assert "zimua/x" in codex.prompt(ctx(tmp_path, True), "do it")
     assert codex.prompt(ctx(tmp_path, False), "more") == "more"
+
+
+def test_claude_sends_images_as_native_blocks(tmp_path: Path) -> None:
+    image = tmp_path / "a.png"
+    image.write_bytes(PNG)
+    plain, with_image = ctx(tmp_path, False), ctx(tmp_path, False)
+    with_image.images = [image]
+    assert "--input-format" not in ClaudeCode().command(plain)
+    assert ClaudeCode().prompt(plain, "hi") == "hi"
+    assert ClaudeCode().command(with_image)[-2:] == ["--input-format", "stream-json"]
+    message = json.loads(ClaudeCode().prompt(with_image, "look"))["message"]
+    assert message["content"] == [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": "image/png",
+                "data": base64.b64encode(PNG).decode(),
+            },
+        },
+        {"type": "text", "text": "look"},
+    ]
+
+
+def test_codex_gets_image_paths_in_the_prompt(tmp_path: Path) -> None:
+    c = ctx(tmp_path, False)
+    c.images = [tmp_path / "x.png"]
+    assert Codex().prompt(c, "look").endswith("(view them):\n../attachments/x.png")
 
 
 def test_codex_credentials(tmp_path: Path) -> None:

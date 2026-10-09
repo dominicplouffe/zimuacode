@@ -6,6 +6,7 @@ import { api, type TaskEvent, type TaskSummary } from '../api/client'
 import { useProviders, useTask, useTaskChanges } from '../api/hooks'
 import { markdownComponents } from '../editor/markdown'
 import { useWorkbench } from '../state/store'
+import { ImageStrip, SentImages, usePastedImages } from './images'
 import { buildTranscript, summarizeTool, type Entry } from './transcript'
 import { useTaskEvents } from './useTaskEvents'
 
@@ -26,13 +27,14 @@ export function formatCost(task: Pick<TaskSummary, 'cost_usd' | 'input_tokens' |
   return `${k} tokens${task.cost_usd ? ` · $${task.cost_usd.toFixed(2)}` : ''}`
 }
 
-function EventView({ event }: { event: TaskEvent }) {
+function EventView({ event, taskId }: { event: TaskEvent; taskId: string }) {
   switch (event.type) {
     case 'user_message':
       return (
         <div className="msg msg-user">
           {event.data.queued ? <div className="msg-note">Queued until the agent finishes</div> : null}
           <div className="msg-text">{text(event)}</div>
+          {Array.isArray(event.data.images) && <SentImages taskId={taskId} names={event.data.images as string[]} />}
         </div>
       )
     case 'assistant_text':
@@ -118,8 +120,8 @@ function EventView({ event }: { event: TaskEvent }) {
   }
 }
 
-function EntryView({ entry }: { entry: Entry }) {
-  if (entry.kind === 'event') return <EventView event={entry.event} />
+function EntryView({ entry, taskId }: { entry: Entry; taskId: string }) {
+  if (entry.kind === 'event') return <EventView event={entry.event} taskId={taskId} />
   if (entry.kind === 'logs') {
     return (
       <details className="msg msg-log">
@@ -149,14 +151,16 @@ function Composer({ task }: { task: TaskSummary }) {
   const canInterrupt = provider?.capabilities.interrupt ?? true
   const [draft, setDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const pasted = usePastedImages(provider?.capabilities.images ?? true)
   const working = task.status === 'running' || task.status === 'preparing'
   const canSend = draft.trim() !== '' && task.status !== 'stopped'
 
   const send = async () => {
     setError(null)
     try {
-      await api.sendMessage(task.id, draft.trim())
+      await api.sendMessage(task.id, draft.trim(), pasted.images.map((i) => i.data))
       setDraft('')
+      pasted.clear()
       queryClient.invalidateQueries({ queryKey: ['task', task.id] })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -181,12 +185,14 @@ function Composer({ task }: { task: TaskSummary }) {
         value={draft}
         disabled={task.status === 'stopped'}
         onChange={(e) => setDraft(e.target.value)}
+        onPaste={pasted.onPaste}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && canSend) send()
         }}
       />
+      <ImageStrip images={pasted.images} onRemove={pasted.remove} />
       <div className="form-actions">
-        {error && <span className="error">{error}</span>}
+        {(error ?? pasted.error) && <span className="error">{error ?? pasted.error}</span>}
         {task.status === 'running' && canInterrupt && (
           <button className="button secondary" onClick={interrupt}>
             Interrupt
@@ -401,7 +407,7 @@ export function TaskView({ taskId }: { taskId: string }) {
           }}
         >
           {entries.map((entry, i) => (
-            <EntryView key={entry.kind === 'event' ? entry.event.seq : entry.kind === 'tool' ? `t${entry.id}` : `l${i}`} entry={entry} />
+            <EntryView taskId={t.id} key={entry.kind === 'event' ? entry.event.seq : entry.kind === 'tool' ? `t${entry.id}` : `l${i}`} entry={entry} />
           ))}
           {t.status === 'running' && <div className="msg-status muted working">Working…</div>}
           <div ref={bottom} />
