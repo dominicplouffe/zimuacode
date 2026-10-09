@@ -4,6 +4,7 @@ Adding a provider means writing one class with these methods and registering it 
 PROVIDERS. The runner, event stream and UI work for it unchanged.
 """
 
+import base64
 import hashlib
 import json
 import re
@@ -15,6 +16,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel
 
 from app.config import Settings
+from app.tasks.attachments import MEDIA_TYPES
 
 # Tool outputs and large tool inputs (e.g. a whole file being written) are clipped in the
 # transcript; the workspace itself has the full content.
@@ -29,6 +31,8 @@ class Capabilities(BaseModel):
     follow_ups: bool
     interrupt: bool
     live_files: bool
+    # Whether pasted images reach the agent.
+    images: bool
     # "self": runs on this server's runner. "vendor": hands off to the vendor's cloud.
     runs_on: str
 
@@ -91,6 +95,8 @@ class TurnContext:
     credential: str | None
     # The agent's HOME on the server's disk, for writing login files.
     home: Path
+    # Pasted images for this message, on the server's disk.
+    images: list[Path] = field(default_factory=list)
 
 
 class AgentProvider(Protocol):
@@ -242,7 +248,12 @@ class ClaudeCode:
         id="claude-code",
         name="Claude Code",
         capabilities=Capabilities(
-            streaming=True, follow_ups=True, interrupt=True, live_files=True, runs_on="self"
+            streaming=True,
+            follow_ups=True,
+            interrupt=True,
+            live_files=True,
+            images=True,
+            runs_on="self",
         ),
         credential_help=(
             "Run `claude setup-token` on your computer (it uses your Claude Pro/Max "
@@ -266,10 +277,28 @@ class ClaudeCode:
             argv += ["--model", task.model]
         if task.session_id:
             argv += ["--session-id" if ctx.first_turn else "--resume", task.session_id]
+        if ctx.images:
+            # Plain-text stdin can't carry images; this takes the message as a JSON line.
+            argv += ["--input-format", "stream-json"]
         return argv
 
     def prompt(self, ctx: TurnContext, text: str) -> str:
-        return text
+        if not ctx.images:
+            return text
+        content: list[dict[str, Any]] = [
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": MEDIA_TYPES[path.suffix[1:]],
+                    "data": base64.b64encode(path.read_bytes()).decode(),
+                },
+            }
+            for path in ctx.images
+        ]
+        content.append({"type": "text", "text": text})
+        message = {"type": "user", "message": {"role": "user", "content": content}}
+        return json.dumps(message) + "\n"
 
     def env(self, ctx: TurnContext) -> dict[str, str]:
         if not ctx.credential:
@@ -384,7 +413,12 @@ class Codex:
         id="codex",
         name="Codex",
         capabilities=Capabilities(
-            streaming=True, follow_ups=True, interrupt=True, live_files=True, runs_on="self"
+            streaming=True,
+            follow_ups=True,
+            interrupt=True,
+            live_files=True,
+            images=True,
+            runs_on="self",
         ),
         credential_help=(
             "Run `codex login` on your computer (it uses your ChatGPT plan) and paste the "
@@ -412,6 +446,10 @@ class Codex:
 
     def prompt(self, ctx: TurnContext, text: str) -> str:
         # Codex has no flag for extra instructions; the first message carries them.
+        if ctx.images:
+            # Relative to the workspace, which is where the agent runs.
+            paths = "\n".join(f"../attachments/{path.name}" for path in ctx.images)
+            text = f"{text}\n\nImages attached to this message (view them):\n{paths}"
         if ctx.first_turn:
             return f"{ide_rules(ctx.task.branch)}\n\n{text}"
         return text
@@ -478,7 +516,12 @@ class CodexCloud:
         id="codex-cloud",
         name="Codex Cloud (hand-off)",
         capabilities=Capabilities(
-            streaming=False, follow_ups=True, interrupt=False, live_files=False, runs_on="vendor"
+            streaming=False,
+            follow_ups=True,
+            interrupt=False,
+            live_files=False,
+            images=False,
+            runs_on="vendor",
         ),
         credential_help=(
             "Uses your Codex login (the same auth.json as Codex) and the environment set in "
@@ -538,7 +581,12 @@ class ClaudeCloud:
         id="claude-cloud",
         name="Claude Code on the web (hand-off)",
         capabilities=Capabilities(
-            streaming=False, follow_ups=True, interrupt=False, live_files=False, runs_on="vendor"
+            streaming=False,
+            follow_ups=True,
+            interrupt=False,
+            live_files=False,
+            images=False,
+            runs_on="vendor",
         ),
         credential_help=(
             "Needs a full claude.ai login, not a setup token: on a Linux machine run "

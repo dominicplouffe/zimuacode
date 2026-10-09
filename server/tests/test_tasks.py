@@ -1,3 +1,4 @@
+import base64
 import json
 import time
 from pathlib import Path
@@ -9,7 +10,7 @@ from fastapi.testclient import TestClient
 from app import db
 from app.config import get_settings
 from app.tasks.providers import ClaudeParser
-from tests.helpers import _git, events, start, wait_for
+from tests.helpers import PNG, _git, events, start, wait_for
 
 
 def test_task_runs_and_streams_normalized_events(app_client: TestClient) -> None:
@@ -46,6 +47,74 @@ def test_follow_up_resumes_the_same_session(app_client: TestClient) -> None:
     ]
     assert texts == ["Started: first", "Resumed: second"]
     assert first["id"] == second["id"]
+
+
+def b64(data: bytes) -> str:
+    return base64.b64encode(data).decode()
+
+
+def test_pasted_images_reach_the_agent_and_the_transcript(app_client: TestClient) -> None:
+    resp = app_client.post(
+        "/api/tasks",
+        json={"provider": "claude-code", "owner": "octo", "name": "app",
+              "base_branch": "main", "prompt": "see", "images": [b64(PNG)]},
+    )  # fmt: skip
+    assert resp.status_code == 201, resp.text
+    task_id = resp.json()["id"]
+    wait_for(app_client, task_id, "idle")
+    app_client.post(
+        f"/api/tasks/{task_id}/messages", json={"text": "again", "images": [b64(PNG), b64(PNG)]}
+    )
+    wait_for(app_client, task_id, "running")
+    wait_for(app_client, task_id, "idle")
+
+    log = events(app_client, task_id)
+    texts = [e["data"]["text"] for e in log if e["type"] == "assistant_text"]
+    assert texts == ["Started: see [image/png]", "Resumed: again [image/png,image/png]"]
+    sent = [e["data"] for e in log if e["type"] == "user_message"]
+    assert [len(m["images"]) for m in sent] == [1, 2]
+    served = app_client.get(f"/api/tasks/{task_id}/attachments/{sent[0]['images'][0]}")
+    assert served.status_code == 200
+    assert served.headers["content-type"] == "image/png"
+    assert served.content == PNG
+
+
+def test_queued_follow_ups_keep_their_images(app_client: TestClient) -> None:
+    task_id = start(app_client, "sleep 1.5")
+    wait_for(app_client, task_id, "running")
+    resp = app_client.post(
+        f"/api/tasks/{task_id}/messages", json={"text": "after", "images": [b64(PNG)]}
+    )
+    assert resp.json()["pending"] == ["after"]
+    wait_for(app_client, task_id, "idle")
+    deadline = time.monotonic() + 10
+    while "Resumed: after [image/png]" not in [
+        e["data"].get("text") for e in events(app_client, task_id)
+    ]:
+        assert time.monotonic() < deadline
+        time.sleep(0.1)
+
+
+def test_bad_images_are_rejected(app_client: TestClient) -> None:
+    task_id = start(app_client, "first")
+    wait_for(app_client, task_id, "idle")
+    url = f"/api/tasks/{task_id}/messages"
+    for images in (["not base64!"], [b64(b"plain text")], [b64(PNG)] * 6):
+        assert app_client.post(url, json={"text": "x", "images": images}).status_code == 422
+    huge = b64(PNG + bytes(5 * 1024 * 1024))
+    assert app_client.post(url, json={"text": "x", "images": [huge]}).status_code == 422
+    assert app_client.get(f"/api/tasks/{task_id}/attachments/../../etc/passwd").status_code == 404
+    assert app_client.get(f"/api/tasks/{task_id}/attachments/{'0' * 32}.png").status_code == 404
+
+
+def test_hand_off_agents_refuse_images(app_client: TestClient) -> None:
+    resp = app_client.post(
+        "/api/tasks",
+        json={"provider": "claude-cloud", "owner": "octo", "name": "app",
+              "base_branch": "main", "prompt": "x", "images": [b64(PNG)]},
+    )  # fmt: skip
+    assert resp.status_code == 422
+    assert "can't take images" in resp.json()["detail"]
 
 
 def test_messages_sent_while_running_are_queued(app_client: TestClient) -> None:

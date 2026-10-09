@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { api } from '../api/client'
 import { useBranches, useEffectiveSettings, useProviders } from '../api/hooks'
 import { useWorkbench } from '../state/store'
+import { ImageStrip, usePastedImages } from './images'
 
 export function NewTask() {
   const queryClient = useQueryClient()
@@ -23,6 +24,9 @@ export function NewTask() {
   const prNumber = draft?.prNumber ?? null
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const chosen = provider ?? (settings?.['ai.defaultProvider'] as string | undefined) ?? 'claude-code'
+  const info = providers.data?.find((p) => p.id === chosen)
+  const pasted = usePastedImages(info?.capabilities.images ?? true)
 
   if (!repo) {
     return (
@@ -35,9 +39,7 @@ export function NewTask() {
     )
   }
 
-  const chosen = provider ?? (settings?.['ai.defaultProvider'] as string | undefined) ?? 'claude-code'
   const chosenModel = model ?? (settings?.['ai.defaultModel'] as string | undefined) ?? ''
-  const info = providers.data?.find((p) => p.id === chosen)
 
   const start = async () => {
     setBusy(true)
@@ -51,6 +53,7 @@ export function NewTask() {
         prompt: prompt.trim(),
         model: chosenModel.trim() || null,
         pr_number: prNumber,
+        images: pasted.images.map((i) => i.data),
       })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
       closeTab('newTask')
@@ -80,11 +83,13 @@ export function NewTask() {
           placeholder="e.g. Add a dark mode toggle to the settings page, with tests"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
+          onPaste={pasted.onPaste}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && prompt.trim() && !busy) start()
           }}
         />
       </label>
+      <ImageStrip images={pasted.images} onRemove={pasted.remove} />
       <div className="form-row">
         <label>
           Agent
@@ -143,7 +148,7 @@ export function NewTask() {
         </p>
       )}
       <div className="form-actions">
-        {error && <span className="error">{error}</span>}
+        {(error ?? pasted.error) && <span className="error">{error ?? pasted.error}</span>}
         <button className="button" disabled={busy || !prompt.trim() || !base} onClick={start}>
           {busy ? 'Starting…' : 'Start task'}
         </button>

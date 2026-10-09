@@ -135,7 +135,8 @@ export const api = {
     ),
   createTask: (body: NewTask) => request<TaskSummary>('POST', '/api/tasks', body),
   task: (id: string) => request<TaskSummary>('GET', `/api/tasks/${id}`),
-  sendMessage: (id: string, text: string) => request<TaskSummary>('POST', `/api/tasks/${id}/messages`, { text }),
+  sendMessage: (id: string, text: string, images: string[]) =>
+    request<TaskSummary>('POST', `/api/tasks/${id}/messages`, { text, images }),
   interrupt: (id: string) => request<TaskSummary>('POST', `/api/tasks/${id}/interrupt`),
   archiveTask: (id: string) => request<void>('DELETE', `/api/tasks/${id}`),
   taskChanges: (id: string) => request<TaskChange[]>('GET', `/api/tasks/${id}/changes`),

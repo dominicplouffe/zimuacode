@@ -18,16 +18,25 @@ export function useTaskEvents(taskId: string): { events: TaskEvent[]; connected:
     const refresh = () => {
       clearTimeout(refreshTimer.current)
       refreshTimer.current = setTimeout(() => {
+        console.log('[task-debug] refetching task', taskId)
         queryClient.invalidateQueries({ queryKey: ['task', taskId] })
         queryClient.invalidateQueries({ queryKey: ['tasks'] })
         queryClient.invalidateQueries({ queryKey: ['taskChanges', taskId] })
         queryClient.invalidateQueries({ queryKey: ['taskFile', taskId] })
       }, 300)
     }
-    source.onopen = () => setConnected(true)
-    source.onerror = () => setConnected(false)
+    source.onopen = () => {
+      console.log('[task-debug] SSE open', taskId)
+      setConnected(true)
+    }
+    source.onerror = () => {
+      console.error('[task-debug] SSE error, readyState =', source.readyState, taskId)
+      setConnected(false)
+    }
     source.onmessage = (message) => {
       const event = JSON.parse(message.data) as TaskEvent
+      if (event.type === 'status' || event.type === 'user_message')
+        console.log('[task-debug] SSE', event.seq, event.type, JSON.stringify(event.data))
       setEvents((prev) => (prev.length && prev[prev.length - 1].seq >= event.seq ? prev : [...prev, event]))
       // Status changes and finished tool calls can change the task and its files.
       if (['status', 'tool_result', 'command', 'file_change', 'usage', 'pr', 'user_message'].includes(event.type))

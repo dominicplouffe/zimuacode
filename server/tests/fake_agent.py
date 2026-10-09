@@ -3,6 +3,7 @@
 The prompt arrives on stdin. Behaviour depends on the prompt:
   "sleep N"  says it is working, then sleeps N seconds (to test queueing and interrupts)
   "fail"     ends with an error result
+  image messages (--input-format stream-json) become "text [media types]"
   otherwise  appends the prompt to AGENT.md, like a real agent editing a file
 """
 
@@ -19,6 +20,12 @@ for flag in ("--session-id", "--resume"):
         session = args[args.index(flag) + 1]
 resumed = "--resume" in args
 prompt = sys.stdin.read().strip()
+if "--input-format" in args:
+    # Image messages arrive as one JSON line; echo the images' types after the text.
+    content = json.loads(prompt)["message"]["content"]
+    text = "".join(b["text"] for b in content if b["type"] == "text")
+    kinds = ",".join(b["source"]["media_type"] for b in content if b["type"] == "image")
+    prompt = f"{text} [{kinds}]"
 
 # Hand-off to Claude Code on the web.
 if "--cloud" in args:

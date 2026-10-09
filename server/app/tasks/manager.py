@@ -17,7 +17,7 @@ from app.db import get_engine
 from app.models import ProviderCredential, RepoConfig, Task, User
 from app.notify import Notifier
 from app.security import decrypt
-from app.tasks import git
+from app.tasks import attachments, git
 from app.tasks.events import EventBus
 from app.tasks.providers import PROVIDERS, AgentProvider, TurnContext
 from app.tasks.sandbox import Sandbox, task_dir, write_turn_script
@@ -46,6 +46,17 @@ def slugify(text: str, limit: int = 32) -> str:
 def title_from_prompt(prompt: str) -> str:
     first = prompt.strip().splitlines()[0] if prompt.strip() else "Task"
     return first if len(first) <= 80 else first[:79] + "…"
+
+
+def queued_message(item: str | dict[str, Any]) -> tuple[str, list[str]]:
+    """The text and attachment names of a queued follow-up."""
+    if isinstance(item, str):
+        return item, []
+    return item["text"], item["images"]
+
+
+def _images_field(names: list[str]) -> dict[str, list[str]]:
+    return {"images": names} if names else {}
 
 
 def user_settings(user_id: int) -> dict[str, Any]:
@@ -114,6 +125,9 @@ class TaskManager:
     def repo_dir(self, task_id: str) -> Path:
         return self.root(task_id) / "repo"
 
+    def attachments_dir(self, task_id: str) -> Path:
+        return self.root(task_id) / "attachments"
+
     def provider(self, task: Task) -> AgentProvider:
         return PROVIDERS[task.provider]
 
@@ -142,11 +156,14 @@ class TaskManager:
         model: str | None,
         github_token: str,
         pr_number: int | None = None,
+        images: list[tuple[bytes, str]] | None = None,
     ) -> Task:
         """Starts a task on a new branch from base_branch, or, with pr_number, directly on
         that PR's branch (base_branch is then the PR's head branch)."""
         if provider not in PROVIDERS:
             raise TaskError(f"Unknown provider {provider}")
+        if images and not PROVIDERS[provider].info.capabilities.images:
+            raise TaskError(f"{PROVIDERS[provider].info.name} can't take images")
         task_id = uuid.uuid4().hex[:12]
         task = Task(
             id=task_id,
@@ -166,11 +183,17 @@ class TaskManager:
             s.add(task)
             s.commit()
             s.refresh(task)
-        self.bus.publish(task_id, "user_message", {"text": prompt})
-        self._spawn(task_id, self._prepare_and_run(task_id, prompt, github_token))
+        names = self._save_images(task_id, images)
+        self.bus.publish(task_id, "user_message", {"text": prompt, **_images_field(names)})
+        self._spawn(task_id, self._prepare_and_run(task_id, prompt, names, github_token))
         return task
 
-    async def _prepare_and_run(self, task_id: str, prompt: str, github_token: str) -> None:
+    def _save_images(self, task_id: str, images: list[tuple[bytes, str]] | None) -> list[str]:
+        return attachments.save(self.attachments_dir(task_id), images) if images else []
+
+    async def _prepare_and_run(
+        self, task_id: str, prompt: str, images: list[str], github_token: str
+    ) -> None:
         task = self.load(task_id)
         self.set_status(task_id, "preparing", "Cloning repository")
         try:
@@ -191,7 +214,7 @@ class TaskManager:
             self.set_status(task_id, "failed", "Workspace setup failed")
             self._notify_turn_end(self.load(task_id))
             return
-        await self._start_turn(task_id, prompt)
+        await self._start_turn(task_id, prompt, images)
 
     async def _run_setup(self, task_id: str, script: str, env: dict[str, str]) -> bool:
         self.set_status(task_id, "preparing", "Running setup script")
@@ -216,7 +239,7 @@ class TaskManager:
         self.set_status(task_id, "failed", "Setup script failed")
         return False
 
-    async def _start_turn(self, task_id: str, prompt: str) -> None:
+    async def _start_turn(self, task_id: str, prompt: str, images: list[str]) -> None:
         task = self.update(
             task_id,
             turn=self.load(task_id).turn + 1,
@@ -234,6 +257,7 @@ class TaskManager:
             user_settings=user_settings(task.user_id),
             credential=credential_for(task.user_id, provider.info.credential_key),
             home=self.root(task_id) / "home",
+            images=[self.attachments_dir(task_id) / name for name in images],
         )
         try:
             provider.setup_home(ctx)
@@ -345,9 +369,10 @@ class TaskManager:
 
         task = self.load(task_id)
         if task.pending and not task.interrupt_requested and task.status in ("idle", "failed"):
-            next_prompt, *rest = task.pending
+            queued, *rest = task.pending
             self.update(task_id, pending=rest)
-            await self._start_turn(task_id, next_prompt)
+            text, images = queued_message(queued)
+            await self._start_turn(task_id, text, images)
             return
         self._notify_turn_end(task)
 
@@ -366,20 +391,26 @@ class TaskManager:
 
     # Requests from the UI
 
-    def send(self, task_id: str, text: str) -> None:
+    def send(self, task_id: str, text: str, images: list[tuple[bytes, str]] | None = None) -> None:
         task = self.load(task_id)
         if task.status == "stopped":
             raise TaskError("This task is archived")
         if task.base_sha is None and task.status != "preparing":
             raise TaskError("The workspace was never set up; start a new task")
+        if images and not self.provider(task).info.capabilities.images:
+            raise TaskError(f"{self.provider(task).info.name} can't take images")
+        names = self._save_images(task_id, images)
         if task.status in ACTIVE:
-            self.update(task_id, pending=[*task.pending, text])
-            self.bus.publish(task_id, "user_message", {"text": text, "queued": True})
+            queued = {"text": text, "images": names}
+            self.update(task_id, pending=[*task.pending, queued])
+            self.bus.publish(
+                task_id, "user_message", {"text": text, **_images_field(names), "queued": True}
+            )
             return
-        self.bus.publish(task_id, "user_message", {"text": text})
+        self.bus.publish(task_id, "user_message", {"text": text, **_images_field(names)})
         # Running from this moment, so nobody sees a stale "idle" before the turn starts.
         self.update(task_id, status="running", status_detail=None)
-        self._spawn(task_id, self._start_turn(task_id, text))
+        self._spawn(task_id, self._start_turn(task_id, text, names))
 
     async def interrupt(self, task_id: str) -> None:
         task = self.load(task_id)

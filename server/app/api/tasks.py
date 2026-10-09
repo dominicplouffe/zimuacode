@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlmodel import col, select
 
@@ -14,8 +14,8 @@ from app.deps import DbDep, GitHubDep, UserDep
 from app.models import ProviderCredential, Task, User
 from app.preview import preview_link
 from app.security import decrypt, encrypt
-from app.tasks import git
-from app.tasks.manager import TaskError, TaskManager
+from app.tasks import attachments, git
+from app.tasks.manager import TaskError, TaskManager, queued_message
 from app.tasks.providers import PROVIDERS, ProviderInfo
 
 router = APIRouter(prefix="/api", tags=["tasks"])
@@ -59,6 +59,15 @@ class TaskSummary(BaseModel):
     updated_at: datetime
 
 
+# Base64 of the largest allowed image, so oversized bodies are refused before decoding.
+MAX_IMAGE_B64 = attachments.MAX_IMAGE_BYTES * 4 // 3 + 4
+# Pasted images: base64 PNG, JPEG, GIF or WebP data, without a data: prefix.
+Images = Annotated[
+    list[Annotated[str, Field(max_length=MAX_IMAGE_B64)]],
+    Field(max_length=attachments.MAX_IMAGES),
+]
+
+
 class NewTask(BaseModel):
     provider: str
     owner: str
@@ -68,10 +77,12 @@ class NewTask(BaseModel):
     model: str | None = None
     # Work directly on this open PR's branch (base_branch must be its head), e.g. to fix CI.
     pr_number: int | None = None
+    images: Images = []
 
 
 class Message(BaseModel):
     text: str = Field(min_length=1)
+    images: Images = []
 
 
 class TaskChange(BaseModel):
@@ -101,7 +112,8 @@ class PublishResult(BaseModel):
 
 
 def _summary(task: Task) -> TaskSummary:
-    return TaskSummary(**task.model_dump(include=set(TaskSummary.model_fields)))
+    fields = task.model_dump(include=set(TaskSummary.model_fields) - {"pending"})
+    return TaskSummary(**fields, pending=[queued_message(item)[0] for item in task.pending])
 
 
 def _own_task(manager: TaskManager, task_id: str, user: User) -> Task:
@@ -112,6 +124,13 @@ def _own_task(manager: TaskManager, task_id: str, user: User) -> Task:
     if task is None or task.user_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Task not found")
     return task
+
+
+def _decode_images(images: list[str]) -> list[tuple[bytes, str]]:
+    try:
+        return attachments.decode(images)
+    except attachments.AttachmentError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
 
 
 def _conflict(e: TaskError) -> HTTPException:
@@ -191,6 +210,7 @@ async def create_task(
             )
         if head["ref"] == pull["base"]["ref"]:
             raise HTTPException(status.HTTP_409_CONFLICT, "Refusing to work on the base branch")
+    images = _decode_images(body.images)
     try:
         task = manager.create(
             user_id=user.id or 0,
@@ -202,6 +222,7 @@ async def create_task(
             model=body.model,
             github_token=decrypt(user.token_enc),
             pr_number=body.pr_number,
+            images=images,
         )
     except TaskError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e)) from e
@@ -255,11 +276,26 @@ async def send_message(
     task_id: str, body: Message, user: UserDep, manager: ManagerDep
 ) -> TaskSummary:
     _own_task(manager, task_id, user)
+    images = _decode_images(body.images)
     try:
-        manager.send(task_id, body.text)
+        manager.send(task_id, body.text, images)
     except TaskError as e:
         raise _conflict(e) from e
     return _summary(manager.load(task_id))
+
+
+@router.get("/tasks/{task_id}/attachments/{name}", response_class=FileResponse)
+def task_attachment(task_id: str, name: str, user: UserDep, manager: ManagerDep) -> FileResponse:
+    _own_task(manager, task_id, user)
+    path = manager.attachments_dir(task_id) / name
+    if not attachments.NAME.match(name) or not path.is_file():
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Attachment not found")
+    return FileResponse(
+        path,
+        media_type=attachments.MEDIA_TYPES[path.suffix[1:]],
+        # The file name is a random id and never changes.
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
+    )
 
 
 @router.post("/tasks/{task_id}/interrupt", status_code=status.HTTP_202_ACCEPTED)

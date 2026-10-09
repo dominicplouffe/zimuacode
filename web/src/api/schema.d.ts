@@ -460,6 +460,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tasks/{task_id}/attachments/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task Attachment */
+        get: operations["task_attachment_api_tasks__task_id__attachments__name__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/tasks/{task_id}/interrupt": {
         parameters: {
             query?: never;
@@ -711,6 +728,8 @@ export interface components {
             interrupt: boolean;
             /** Live Files */
             live_files: boolean;
+            /** Images */
+            images: boolean;
             /** Runs On */
             runs_on: string;
         };
@@ -846,6 +865,11 @@ export interface components {
         Message: {
             /** Text */
             text: string;
+            /**
+             * Images
+             * @default []
+             */
+            images: string[];
         };
         /** NewComment */
         NewComment: {
@@ -874,6 +898,11 @@ export interface components {
             model?: string | null;
             /** Pr Number */
             pr_number?: number | null;
+            /**
+             * Images
+             * @default []
+             */
+            images: string[];
         };
         /** PreviewLink */
         PreviewLink: {
@@ -2245,6 +2274,36 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TaskSummary"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_attachment_api_tasks__task_id__attachments__name__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
