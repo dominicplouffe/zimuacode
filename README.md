@@ -53,7 +53,7 @@ cd web && npm run typecheck && npm run lint && npm test
 cd web && npx vite build && npm run e2e   # Playwright against a fake GitHub
 ```
 
-To run all of these in GitHub Actions, copy `deploy/github-ci.yml` to `.github/workflows/ci.yml`.
+GitHub Actions runs all of these on every pull request and on pushes to `main` (`.github/workflows/ci.yml`).
 
 ## Deploying to a VM
 
