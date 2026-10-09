@@ -1,3 +1,4 @@
+import asyncio
 import base64
 import json
 import time
@@ -5,10 +6,14 @@ from pathlib import Path
 
 import pytest
 import respx
+from fastapi import Request
 from fastapi.testclient import TestClient
+from sqlmodel import Session, select
 
 from app import db
+from app.api.tasks import task_events
 from app.config import get_settings
+from app.models import User
 from app.tasks.providers import ClaudeParser
 from tests.helpers import PNG, _git, events, start, wait_for
 
@@ -115,6 +120,21 @@ def test_hand_off_agents_refuse_images(app_client: TestClient) -> None:
     )  # fmt: skip
     assert resp.status_code == 422
     assert "can't take images" in resp.json()["detail"]
+
+
+def test_open_event_stream_holds_no_database_connection(app_client: TestClient) -> None:
+    """Streams stay open for hours; each one pinning a pooled connection starves the app."""
+    task_id = start(app_client, "first")
+    wait_for(app_client, task_id, "idle")
+    pool = db.get_engine().pool
+    session = Session(db.get_engine())
+    user = session.exec(select(User)).first()
+    assert user is not None and pool.checkedout() == 1  # type: ignore[attr-defined]
+
+    manager = app_client.app.state.tasks  # type: ignore[attr-defined]
+    request = Request({"type": "http", "headers": []})
+    asyncio.run(task_events(task_id, request, user, session, manager))
+    assert pool.checkedout() == 0  # type: ignore[attr-defined]
 
 
 def test_messages_sent_while_running_are_queued(app_client: TestClient) -> None:

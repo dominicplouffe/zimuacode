@@ -239,12 +239,16 @@ async def task_events(
     task_id: str,
     request: Request,
     user: UserDep,
+    db: DbDep,
     manager: ManagerDep,
     after: int = Query(0, ge=0),
 ) -> StreamingResponse:
     """Server-sent events: the transcript so far, then live updates. EventSource resumes
     from Last-Event-ID after a reconnect, so nothing is missed or repeated."""
     _own_task(manager, task_id, user)
+    # The request's session would otherwise keep its pooled connection until the stream
+    # ends, and a few open streams would starve every other request.
+    db.close()
     last_id = request.headers.get("last-event-id", "")
     start = int(last_id) if last_id.isdigit() else after
 
