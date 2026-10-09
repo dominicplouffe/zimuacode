@@ -1,0 +1,14 @@
+{$ZIMUA_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy server:8000 {
+		# Agent transcripts stream as server-sent events; send each one immediately.
+		flush_interval -1
+	}
+}
+
+# App previews: the server proxies this origin to dev servers in task workspaces.
+{$ZIMUA_PREVIEW_DOMAIN} {
+	reverse_proxy server:8000 {
+		flush_interval -1
+	}
+}

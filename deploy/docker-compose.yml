@@ -1,0 +1,61 @@
+# Single-VM deployment: Caddy terminates TLS and proxies to the Zimua server, which starts
+# one runner container per agent task through the host's Docker socket.
+#
+# Usage:
+#   cp .env.example .env            # fill it in
+#   sudo mkdir -p /srv/zimua && sudo chown 1000:1000 /srv/zimua
+#   docker compose up -d --build
+services:
+  server:
+    build:
+      context: ..
+    env_file: .env
+    environment:
+      ZIMUA_PUBLIC_URL: https://${ZIMUA_DOMAIN}
+      ZIMUA_SANDBOX: docker
+      ZIMUA_RUNNER_IMAGE: zimua-runner:latest
+      # Task workspaces are bind-mounted into runner containers by host path, so the data
+      # directory must have the same path on the host and in this container.
+      ZIMUA_DATA_DIR: /srv/zimua
+      ZIMUA_DATABASE_URL: sqlite:////srv/zimua/zimua.db
+      # App previews get their own origin; task containers join this network so the
+      # server can reach their dev servers.
+      ZIMUA_PREVIEW_URL: https://${ZIMUA_PREVIEW_DOMAIN}
+      ZIMUA_DOCKER_NETWORK: zimua
+    user: "1000:1000"
+    group_add:
+      - ${DOCKER_GID}
+    volumes:
+      - /srv/zimua:/srv/zimua
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+
+  # Builds the image agent tasks run in; the container itself exits immediately.
+  runner-image:
+    build:
+      context: ../runner-image
+    image: zimua-runner:latest
+    entrypoint: ["true"]
+    restart: "no"
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      ZIMUA_DOMAIN: ${ZIMUA_DOMAIN}
+      ZIMUA_PREVIEW_DOMAIN: ${ZIMUA_PREVIEW_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - server
+    restart: unless-stopped
+
+networks:
+  default:
+    name: zimua
+
+volumes:
+  caddy-data:

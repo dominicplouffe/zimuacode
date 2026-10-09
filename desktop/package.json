@@ -1,0 +1,13 @@
+{
+  "name": "zimua-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Electron shell for Zimua Code. It loads the web app from your Zimua server.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^38.0.0"
+  }
+}
