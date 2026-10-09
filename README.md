@@ -37,6 +37,7 @@ Requirements: Python 3.12+, [uv](https://docs.astral.sh/uv/) and Node 22.
    uv sync
    uv run uvicorn app.main:app --reload
    ```
+   The database and task workspaces live in `~/.local/share/zimua` (or `$XDG_DATA_HOME/zimua`), outside the source tree, so cloning a repo doesn't trigger a reload. Set `ZIMUA_DATA_DIR` to put them elsewhere. If you have an older `server/data/` folder, move it there: `mv server/data ~/.local/share/zimua`.
 3. Start the web app (Vite proxies `/api` to the server):
    ```sh
    cd web

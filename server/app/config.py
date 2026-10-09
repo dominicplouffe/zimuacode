@@ -1,11 +1,19 @@
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEV_SECRET_KEY = "dev-insecure-change-me"
+
+
+def _default_data_dir() -> Path:
+    # Outside the source tree, so cloned workspaces don't trip `uvicorn --reload`.
+    base = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share"
+    return Path(base) / "zimua"
 
 
 class Settings(BaseSettings):
@@ -16,7 +24,8 @@ class Settings(BaseSettings):
     # Public origin the browser uses. The OAuth callback and post-login redirect are built from it.
     public_url: str = "http://localhost:5173"
     secret_key: str = DEV_SECRET_KEY
-    database_url: str = "sqlite:///./data/zimua.db"
+    # Defaults to zimua.db in data_dir.
+    database_url: str = ""
 
     github_client_id: str = ""
     github_client_secret: str = ""
@@ -31,7 +40,7 @@ class Settings(BaseSettings):
 
     # Where task workspaces and agent logs live. With the docker sandbox it must be the same
     # path on the host and inside the server container (bind-mounted at the same location).
-    data_dir: Path = Path("./data")
+    data_dir: Path = _default_data_dir()
     # "docker": one container per task (isolated). "local": plain processes on this machine,
     # with no isolation; for development, or a VM dedicated to the agents.
     sandbox: Literal["local", "docker"] = "local"
@@ -53,6 +62,12 @@ class Settings(BaseSettings):
     dev_login: bool = False
     cookie_secure: bool = False
     session_max_age_days: int = 30
+
+    @model_validator(mode="after")
+    def _default_database_url(self) -> "Settings":
+        if not self.database_url:
+            self.database_url = f"sqlite:///{self.data_dir / 'zimua.db'}"
+        return self
 
 
 @lru_cache
