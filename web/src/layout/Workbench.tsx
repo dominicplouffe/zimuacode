@@ -4,11 +4,14 @@ import { useEffectiveSettings, useThemes } from '../api/hooks'
 import { Palette } from '../commands/Palette'
 import { monaco } from '../editor/monaco'
 import { Explorer } from '../panels/Explorer'
+import { PullRequests } from '../panels/PullRequests'
+import { SourceControl } from '../panels/SourceControl'
 import { useWorkbench } from '../state/store'
 import { monacoThemeId, themeCssVars, toMonacoTheme } from '../theme/theme'
 import { ActivityBar } from './ActivityBar'
 import { EditorArea } from './EditorArea'
 import { StatusBar } from './StatusBar'
+import { Toast } from './Toast'
 
 function useTheme(): string {
   const settings = useEffectiveSettings()
@@ -42,7 +45,12 @@ function useKeybindings() {
       else if (key === 'p') s.setPalette(s.palette === 'files' ? null : 'files')
       else if (key === 'b' && !e.shiftKey) s.toggleSidebar()
       else if (key === ',') s.openSettings()
-      else handled = false
+      else if (key === 's') {
+        // Edits are kept automatically; just keep the browser's "save page" dialog away.
+        // Not stopped, so the settings editor still sees it.
+        e.preventDefault()
+        return
+      } else handled = false
       if (handled) {
         // Capture phase, so this wins over Monaco and the browser (print, bookmarks).
         e.preventDefault()
@@ -56,6 +64,7 @@ function useKeybindings() {
 
 export function Workbench() {
   const sidebarVisible = useWorkbench((s) => s.sidebarVisible)
+  const sidebar = useWorkbench((s) => s.sidebar)
   const monacoTheme = useTheme()
   useKeybindings()
 
@@ -67,7 +76,9 @@ export function Workbench() {
           {sidebarVisible && (
             <>
               <Panel id="sidebar" defaultSize={260} minSize={160} maxSize="60%" className="sidebar">
-                <Explorer />
+                {sidebar === 'explorer' && <Explorer />}
+                {sidebar === 'scm' && <SourceControl />}
+                {sidebar === 'pulls' && <PullRequests />}
               </Panel>
               <Separator className="separator" />
             </>
@@ -79,6 +90,7 @@ export function Workbench() {
       </div>
       <StatusBar />
       <Palette />
+      <Toast />
     </div>
   )
 }

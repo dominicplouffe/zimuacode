@@ -1,21 +1,13 @@
-from collections.abc import Awaitable
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Query, status
+from pydantic import BaseModel, Field
 
+from app.api.common import gh_call
 from app.deps import GitHubDep
-from app.github.client import MAX_EDITOR_BYTES, GitHubError, decode_text
+from app.github.client import MAX_EDITOR_BYTES, decode_text
 
 router = APIRouter(prefix="/api/repos", tags=["repos"])
-
-
-async def _gh[T](call: Awaitable[T]) -> T:
-    try:
-        return await call
-    except GitHubError as e:
-        status = e.status if e.status in (401, 403, 404, 409, 422) else 502
-        raise HTTPException(status, e.message) from e
 
 
 class Repo(BaseModel):
@@ -53,7 +45,8 @@ class TreeEntry(BaseModel):
 
 
 class Tree(BaseModel):
-    sha: str
+    # The commit the ref pointed to. Reads and commits use it, so they see one snapshot.
+    commit_sha: str
     truncated: bool
     entries: list[TreeEntry]
 
@@ -68,36 +61,49 @@ class FileContent(BaseModel):
     too_large: bool
 
 
+class CreateBranch(BaseModel):
+    name: str = Field(min_length=1)
+    from_sha: str = Field(min_length=1)
+
+
 @router.get("")
 async def list_repos(gh: GitHubDep, page: int = 1) -> list[Repo]:
-    return [_repo(r) for r in await _gh(gh.repos(page=page))]
+    return [_repo(r) for r in await gh_call(gh.repos(page=page))]
 
 
 @router.get("/{owner}/{name}")
 async def get_repo(owner: str, name: str, gh: GitHubDep) -> Repo:
-    return _repo(await _gh(gh.repo(owner, name)))
+    return _repo(await gh_call(gh.repo(owner, name)))
 
 
 @router.get("/{owner}/{name}/branches")
 async def list_branches(owner: str, name: str, gh: GitHubDep) -> list[Branch]:
-    branches: list[Branch] = []
-    page = 1
-    while True:
-        batch = await _gh(gh.branches(owner, name, page=page))
-        branches += [
-            Branch(name=b["name"], sha=b["commit"]["sha"], protected=b.get("protected", False))
-            for b in batch
-        ]
-        if len(batch) < 100 or page >= 10:
-            return branches
-        page += 1
+    return [
+        Branch(name=b["name"], sha=b["commit"]["sha"], protected=b.get("protected", False))
+        for b in await gh_call(gh.branches(owner, name))
+    ]
+
+
+@router.post("/{owner}/{name}/branches", status_code=status.HTTP_201_CREATED)
+async def create_branch(owner: str, name: str, body: CreateBranch, gh: GitHubDep) -> Branch:
+    await gh_call(gh.create_ref(owner, name, body.name, body.from_sha))
+    return Branch(name=body.name, sha=body.from_sha, protected=False)
+
+
+@router.delete("/{owner}/{name}/branches", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_branch(owner: str, name: str, gh: GitHubDep, branch: str = Query(...)) -> None:
+    repo = await gh_call(gh.repo(owner, name))
+    if branch == repo["default_branch"]:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Can't delete the default branch")
+    await gh_call(gh.delete_ref(owner, name, branch))
 
 
 @router.get("/{owner}/{name}/tree")
 async def get_tree(owner: str, name: str, gh: GitHubDep, ref: str = Query(...)) -> Tree:
-    data = await _gh(gh.tree(owner, name, ref))
+    commit = await gh_call(gh.commit(owner, name, ref))
+    data = await gh_call(gh.tree(owner, name, commit["commit"]["tree"]["sha"]))
     return Tree(
-        sha=data["sha"],
+        commit_sha=commit["sha"],
         truncated=data.get("truncated", False),
         entries=[
             TreeEntry(path=e["path"], type=e["type"], size=e.get("size")) for e in data["tree"]
@@ -109,7 +115,7 @@ async def get_tree(owner: str, name: str, gh: GitHubDep, ref: str = Query(...)) 
 async def get_file(
     owner: str, name: str, gh: GitHubDep, path: str = Query(...), ref: str = Query(...)
 ) -> FileContent:
-    data = await _gh(gh.file(owner, name, path, ref))
+    data = await gh_call(gh.file(owner, name, path, ref))
     if len(data) > MAX_EDITOR_BYTES:
         return FileContent(
             path=path, ref=ref, size=len(data), content=None, binary=False, too_large=True

@@ -18,6 +18,13 @@ export function getCommands(queryClient: QueryClient): Command[] {
     { id: 'files.quickOpen', title: 'Go to File…', keybinding: `${MOD}P`, run: () => s.setPalette('files') },
     { id: 'repo.open', title: 'Open Repository…', run: () => s.setPalette('repos') },
     { id: 'repo.switchBranch', title: 'Switch Branch…', run: () => s.setPalette('branches') },
+    { id: 'files.new', title: 'New File…', run: () => s.setPalette('newFile') },
+    { id: 'git.createBranch', title: 'Create Branch…', run: () => s.setPalette('newBranch') },
+    { id: 'git.deleteBranch', title: 'Delete Branch…', run: () => s.setPalette('deleteBranch') },
+    { id: 'git.showChecks', title: 'Show Checks for Current Branch', run: () => s.setPalette('checks') },
+    { id: 'pr.create', title: 'Create Pull Request', run: () => s.openTab({ id: 'newPr', kind: 'newPr' }) },
+    { id: 'workbench.showScm', title: 'View: Show Source Control', run: () => useWorkbench.setState({ sidebar: 'scm', sidebarVisible: true }) },
+    { id: 'workbench.showPulls', title: 'View: Show Pull Requests', run: () => useWorkbench.setState({ sidebar: 'pulls', sidebarVisible: true }) },
     { id: 'workbench.selectTheme', title: 'Preferences: Color Theme', run: () => s.setPalette('themes') },
     { id: 'workbench.openSettings', title: 'Preferences: Open Settings (JSON)', keybinding: `${MOD},`, run: s.openSettings },
     { id: 'workbench.toggleSidebar', title: 'View: Toggle Sidebar', keybinding: `${MOD}B`, run: s.toggleSidebar },
@@ -32,8 +39,11 @@ export function getCommands(queryClient: QueryClient): Command[] {
     },
     {
       id: 'repo.refresh',
-      title: 'Refresh Files',
-      run: () => queryClient.invalidateQueries({ queryKey: ['tree'] }),
+      title: 'Refresh',
+      run: () => {
+        for (const queryKey of [['tree'], ['branches'], ['pulls'], ['checks']])
+          queryClient.invalidateQueries({ queryKey })
+      },
     },
     {
       id: 'auth.signOut',

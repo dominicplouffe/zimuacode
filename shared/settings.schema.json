@@ -39,12 +39,6 @@
       "default": false,
       "description": "Show the minimap."
     },
-    "files.autoSave": {
-      "type": "string",
-      "enum": ["off", "afterDelay", "onFocusChange"],
-      "default": "off",
-      "description": "When edited files are saved."
-    },
     "ai.defaultProvider": {
       "type": "string",
       "enum": ["claude-code", "codex"],

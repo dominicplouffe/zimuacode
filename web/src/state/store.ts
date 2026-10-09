@@ -7,10 +7,31 @@ export interface RepoRef {
   defaultBranch: string
 }
 
-export type Tab = { id: string; kind: 'file'; path: string } | { id: 'settings'; kind: 'settings' }
+/** One side of a diff between two commits; null when the file doesn't exist on that side. */
+export type DiffSide = { ref: string; path: string } | null
 
-export type SidebarView = 'explorer'
-export type Palette = 'files' | 'commands' | 'repos' | 'branches' | 'themes' | null
+export type Tab =
+  | { id: string; kind: 'file'; path: string }
+  | { id: 'settings'; kind: 'settings' }
+  // An uncommitted change from the working copy, against what it was edited from.
+  | { id: string; kind: 'workingDiff'; path: string }
+  | { id: string; kind: 'diff'; title: string; base: DiffSide; head: DiffSide }
+  | { id: string; kind: 'pr'; number: number }
+  | { id: 'newPr'; kind: 'newPr' }
+  | { id: string; kind: 'log'; jobId: number; title: string }
+
+export type SidebarView = 'explorer' | 'scm' | 'pulls'
+export type Palette =
+  | 'files'
+  | 'commands'
+  | 'repos'
+  | 'branches'
+  | 'themes'
+  | 'newFile'
+  | 'newBranch'
+  | 'deleteBranch'
+  | 'checks'
+  | null
 
 interface WorkbenchState {
   repo: RepoRef | null
@@ -19,10 +40,13 @@ interface WorkbenchState {
   sidebar: SidebarView
   sidebarVisible: boolean
   palette: Palette
+  toast: { message: string; error: boolean } | null
+  notify: (message: string, error?: boolean) => void
   openRepo: (repo: RepoRef) => void
   setRef: (ref: string) => void
   openFile: (path: string) => void
   openSettings: () => void
+  openTab: (tab: Tab) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   showSidebar: (view: SidebarView) => void
@@ -58,10 +82,19 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
   sidebar: 'explorer',
   sidebarVisible: true,
   palette: null,
+  toast: null,
 
+  notify: (message, error = false) => {
+    const toast = { message, error }
+    set({ toast })
+    setTimeout(() => {
+      if (get().toast === toast) set({ toast: null })
+    }, error ? 8000 : 4000)
+  },
   openRepo: (repo) => {
     saveLastRepo(repo)
-    const tabs = get().tabs.filter((t) => t.kind !== 'file')
+    // Everything except settings belongs to the previous repo.
+    const tabs = get().tabs.filter((t) => t.kind === 'settings')
     set({ repo, tabs, activeTab: tabs[0]?.id ?? null })
   },
   setRef: (ref) => {
@@ -72,20 +105,11 @@ export const useWorkbench = create<WorkbenchState>((set, get) => ({
     // Open files keep their paths; their contents reload from the new ref.
     set({ repo: next })
   },
-  openFile: (path) => {
-    const id = fileTabId(path)
+  openFile: (path) => get().openTab({ id: fileTabId(path), kind: 'file', path }),
+  openSettings: () => get().openTab({ id: 'settings', kind: 'settings' }),
+  openTab: (tab) => {
     const { tabs } = get()
-    set({
-      tabs: tabs.some((t) => t.id === id) ? tabs : [...tabs, { id, kind: 'file', path }],
-      activeTab: id,
-    })
-  },
-  openSettings: () => {
-    const { tabs } = get()
-    set({
-      tabs: tabs.some((t) => t.id === 'settings') ? tabs : [...tabs, { id: 'settings', kind: 'settings' }],
-      activeTab: 'settings',
-    })
+    set({ tabs: tabs.some((t) => t.id === tab.id) ? tabs : [...tabs, tab], activeTab: tab.id })
   },
   closeTab: (id) => {
     const { tabs, activeTab } = get()

@@ -26,11 +26,59 @@ export const useTree = (repo: RepoRef | null) =>
     enabled: repo !== null,
   })
 
-export const useFile = (repo: RepoRef | null, path: string) =>
+/** A file at a ref. Pass a commit SHA where possible; it never changes, so it caches forever. */
+export const useFile = (repo: RepoRef | null, path: string | null, ref: string | undefined) =>
   useQuery({
-    queryKey: ['file', repo?.owner, repo?.name, repo?.ref, path],
-    queryFn: () => api.file(repo!.owner, repo!.name, path, repo!.ref),
+    queryKey: ['file', repo?.owner, repo?.name, ref, path],
+    queryFn: () => api.file(repo!.owner, repo!.name, path!, ref!),
+    enabled: repo !== null && path !== null && ref !== undefined,
+    staleTime: Infinity,
+  })
+
+export const usePulls = (repo: RepoRef | null, state: 'open' | 'closed') =>
+  useQuery({
+    queryKey: ['pulls', repo?.owner, repo?.name, state],
+    queryFn: () => api.pulls(repo!.owner, repo!.name, state),
     enabled: repo !== null,
+  })
+
+/** The open PR whose head is the current branch, if any. */
+export const useBranchPull = (repo: RepoRef | null) =>
+  useQuery({
+    queryKey: ['pulls', repo?.owner, repo?.name, 'branch', repo?.ref],
+    queryFn: async () => (await api.pulls(repo!.owner, repo!.name, 'open', repo!.ref))[0] ?? null,
+    enabled: repo !== null,
+  })
+
+export const usePull = (repo: RepoRef | null, number: number) =>
+  useQuery({
+    queryKey: ['pull', repo?.owner, repo?.name, number],
+    queryFn: () => api.pull(repo!.owner, repo!.name, number),
+    enabled: repo !== null,
+  })
+
+export const usePullFiles = (repo: RepoRef | null, number: number, headSha: string | undefined) =>
+  useQuery({
+    queryKey: ['pullFiles', repo?.owner, repo?.name, number, headSha],
+    queryFn: () => api.pullFiles(repo!.owner, repo!.name, number),
+    enabled: repo !== null && headSha !== undefined,
+  })
+
+export const usePullTimeline = (repo: RepoRef | null, number: number) =>
+  useQuery({
+    queryKey: ['timeline', repo?.owner, repo?.name, number],
+    queryFn: () => api.pullTimeline(repo!.owner, repo!.name, number),
+    enabled: repo !== null,
+  })
+
+export const useChecks = (repo: RepoRef | null, sha: string | undefined) =>
+  useQuery({
+    queryKey: ['checks', repo?.owner, repo?.name, sha],
+    queryFn: () => api.checks(repo!.owner, repo!.name, sha!),
+    enabled: repo !== null && sha !== undefined,
+    // Running checks change; poll while the tab is open.
+    refetchInterval: (query) =>
+      query.state.data?.some((c) => c.status !== 'completed') ? 15_000 : false,
   })
 
 /** Effective settings, or undefined until loaded. */

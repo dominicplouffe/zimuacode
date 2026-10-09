@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import auth, repos, settings
+from app.api import auth, commits, pulls, repos, settings
 from app.config import DEV_SECRET_KEY, get_settings
 from app.db import init_db
 
@@ -27,6 +27,8 @@ def create_app() -> FastAPI:
     app.include_router(auth.router)
     app.include_router(repos.router)
     app.include_router(settings.router)
+    app.include_router(commits.router)
+    app.include_router(pulls.router)
 
     @app.get("/api/health", tags=["meta"])
     def health() -> dict[str, str]:

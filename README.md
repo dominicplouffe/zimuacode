@@ -2,7 +2,7 @@
 
 A web IDE, similar to VS Code, for working with Claude Code and Codex on your GitHub repos. It runs in the browser or as an Electron app, both talking to one server you host.
 
-**Status:** Phase 1 of 5 (see [Roadmap](#roadmap)). You can sign in with GitHub, browse any repo and branch, open files in the editor, and change settings and themes. Agent tasks start in Phase 3.
+**Status:** Phases 1–2 of 5 (see [Roadmap](#roadmap)). You can sign in with GitHub, browse any repo and branch, edit and commit files, review and merge pull requests, read CI logs, and change settings and themes. Agent tasks start in Phase 3.
 
 ## How it fits together
 
@@ -89,7 +89,6 @@ Open them with **⌘,** (Ctrl+, on Windows and Linux), the gear icon, or "Prefer
 | `editor.tabSize` | `4` |
 | `editor.wordWrap` | `"off"` |
 | `editor.minimap` | `false` |
-| `files.autoSave` | `"off"` |
 | `ai.defaultProvider` | `"claude-code"` |
 | `ai.defaultModel` | `""` (the provider's default) |
 | `notifications.enabled` | `true` |
@@ -109,7 +108,7 @@ To add a theme, drop a VS Code color theme JSON into `shared/themes/`.
 ## Roadmap
 
 1. **Skeleton** ✅: GitHub sign-in, repo and branch browsing, editor, quick open, command palette, settings, themes, Electron shell, deploy files.
-2. **Git**: branches, PR list/detail/diff, CI checks and logs, create and merge PRs, editing and committing to a branch.
+2. **Git** ✅: branches (switch, create, delete), editing with a per-branch working copy, atomic commits (to the branch or a new one), PR list and PR view (description, checks, files and diffs, conversation, comments, merge), CI logs, PR and CI status in the status bar.
 3. **Agent runner and Claude Code**: per-task containers running `claude -p --output-format stream-json` with your subscription login, a live task panel, follow-ups and interrupt, a live file view, diff review, then a PR.
 4. **Codex and cloud dispatch**: `codex exec --json` in the runner. Hand-off to Claude Code on the web (`claude --cloud`) and Codex Cloud, with reduced visibility because neither has a public API.
 5. **Extras**: push notifications, preview URLs for dev servers, a terminal, per-repo secrets and setup scripts, a usage view, and "Fix CI".

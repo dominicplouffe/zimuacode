@@ -1,6 +1,11 @@
 import { expect, test, type Page } from '@playwright/test'
 
 const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+const FAKE_GITHUB = 'http://localhost:9001'
+
+test.beforeEach(async ({ request }) => {
+  await request.post(`${FAKE_GITHUB}/__reset`)
+})
 
 async function signIn(page: Page) {
   const resp = await page.request.post('/api/auth/dev-login', { data: { token: 'fake' } })

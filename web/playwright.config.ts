@@ -6,6 +6,8 @@ const FAKE_GITHUB_PORT = 9001
 export default defineConfig({
   testDir: 'e2e',
   timeout: 30_000,
+  // The fake GitHub is shared, stateful and reset before each test, so tests run one at a time.
+  workers: 1,
   use: {
     baseURL: `http://localhost:${PORT}`,
     launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},

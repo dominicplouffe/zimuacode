@@ -32,10 +32,11 @@ describe('workbench store', () => {
     expect(useWorkbench.getState().activeTab).toBeNull()
   })
 
-  it('closes file tabs but keeps settings when switching repos', () => {
+  it('closes repo tabs but keeps settings when switching repos', () => {
     const s = useWorkbench.getState()
     s.openSettings()
     s.openFile('a.py')
+    s.openTab({ id: 'pr:1', kind: 'pr', number: 1 })
     s.openRepo(repo)
     expect(useWorkbench.getState().tabs.map((t) => t.id)).toEqual(['settings'])
   })

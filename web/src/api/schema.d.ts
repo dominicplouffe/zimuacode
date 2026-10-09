@@ -116,8 +116,10 @@ export interface paths {
         /** List Branches */
         get: operations["list_branches_api_repos__owner___name__branches_get"];
         put?: never;
-        post?: never;
-        delete?: never;
+        /** Create Branch */
+        post: operations["create_branch_api_repos__owner___name__branches_post"];
+        /** Delete Branch */
+        delete: operations["delete_branch_api_repos__owner___name__branches_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -192,6 +194,163 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/repos/{owner}/{name}/commits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit
+         * @description Commits a set of file changes atomically using the git data API.
+         */
+        post: operations["commit_api_repos__owner___name__commits_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repos/{owner}/{name}/pulls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pulls */
+        get: operations["list_pulls_api_repos__owner___name__pulls_get"];
+        put?: never;
+        /** Create Pull */
+        post: operations["create_pull_api_repos__owner___name__pulls_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repos/{owner}/{name}/pulls/{number}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Pull */
+        get: operations["get_pull_api_repos__owner___name__pulls__number__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repos/{owner}/{name}/pulls/{number}/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Pull Files */
+        get: operations["list_pull_files_api_repos__owner___name__pulls__number__files_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repos/{owner}/{name}/pulls/{number}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pull Timeline */
+        get: operations["pull_timeline_api_repos__owner___name__pulls__number__timeline_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repos/{owner}/{name}/pulls/{number}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Comment */
+        post: operations["add_comment_api_repos__owner___name__pulls__number__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repos/{owner}/{name}/pulls/{number}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Merge Pull */
+        put: operations["merge_pull_api_repos__owner___name__pulls__number__merge_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repos/{owner}/{name}/checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Checks */
+        get: operations["list_checks_api_repos__owner___name__checks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/repos/{owner}/{name}/checks/{job_id}/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check Logs */
+        get: operations["check_logs_api_repos__owner___name__checks__job_id__logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -222,6 +381,82 @@ export interface components {
             /** Protected */
             protected: boolean;
         };
+        /** Check */
+        Check: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "check_run" | "status";
+            /** Status */
+            status: string;
+            /** Conclusion */
+            conclusion: string | null;
+            /** Url */
+            url: string | null;
+            /** Has Logs */
+            has_logs: boolean;
+        };
+        /** CommitRequest */
+        CommitRequest: {
+            /** Branch */
+            branch: string;
+            /** Expected Head */
+            expected_head: string;
+            /** Message */
+            message: string;
+            /** Changes */
+            changes: components["schemas"]["FileChange"][];
+            /**
+             * Create Branch
+             * @default false
+             */
+            create_branch: boolean;
+        };
+        /** CommitResult */
+        CommitResult: {
+            /** Sha */
+            sha: string;
+            /** Branch */
+            branch: string;
+        };
+        /** CreateBranch */
+        CreateBranch: {
+            /** Name */
+            name: string;
+            /** From Sha */
+            from_sha: string;
+        };
+        /** CreatePull */
+        CreatePull: {
+            /** Title */
+            title: string;
+            /** Head */
+            head: string;
+            /** Base */
+            base: string;
+            /**
+             * Body
+             * @default
+             */
+            body: string;
+            /**
+             * Draft
+             * @default false
+             */
+            draft: boolean;
+        };
+        /** FileChange */
+        FileChange: {
+            /** Path */
+            path: string;
+            /** Content */
+            content: string | null;
+        };
         /** FileContent */
         FileContent: {
             /** Path */
@@ -250,6 +485,116 @@ export interface components {
             name: string | null;
             /** Avatar Url */
             avatar_url: string | null;
+        };
+        /** MergeRequest */
+        MergeRequest: {
+            /**
+             * Method
+             * @default merge
+             * @enum {string}
+             */
+            method: "merge" | "squash" | "rebase";
+        };
+        /** MergeResult */
+        MergeResult: {
+            /** Merged */
+            merged: boolean;
+            /** Sha */
+            sha: string | null;
+            /** Message */
+            message: string;
+        };
+        /** NewComment */
+        NewComment: {
+            /** Body */
+            body: string;
+        };
+        /** Pull */
+        Pull: {
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "closed";
+            /** Draft */
+            draft: boolean;
+            /** Merged */
+            merged: boolean;
+            /** Author */
+            author: string;
+            /** Head Ref */
+            head_ref: string;
+            /** Head Sha */
+            head_sha: string;
+            /** Base Ref */
+            base_ref: string;
+            /** Updated At */
+            updated_at: string;
+            /** Html Url */
+            html_url: string;
+            /** Body */
+            body: string | null;
+            /** Base Sha */
+            base_sha: string;
+            /** Merge Base Sha */
+            merge_base_sha: string;
+            /** Mergeable */
+            mergeable: boolean | null;
+            /** Mergeable State */
+            mergeable_state: string;
+            /** Additions */
+            additions: number;
+            /** Deletions */
+            deletions: number;
+            /** Changed Files */
+            changed_files: number;
+            /** Head Repo */
+            head_repo: string | null;
+        };
+        /** PullFile */
+        PullFile: {
+            /** Filename */
+            filename: string;
+            /** Status */
+            status: string;
+            /** Previous Filename */
+            previous_filename: string | null;
+            /** Additions */
+            additions: number;
+            /** Deletions */
+            deletions: number;
+        };
+        /** PullSummary */
+        PullSummary: {
+            /** Number */
+            number: number;
+            /** Title */
+            title: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "open" | "closed";
+            /** Draft */
+            draft: boolean;
+            /** Merged */
+            merged: boolean;
+            /** Author */
+            author: string;
+            /** Head Ref */
+            head_ref: string;
+            /** Head Sha */
+            head_sha: string;
+            /** Base Ref */
+            base_ref: string;
+            /** Updated At */
+            updated_at: string;
+            /** Html Url */
+            html_url: string;
         };
         /** Repo */
         Repo: {
@@ -290,10 +635,34 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
+        /** TimelineItem */
+        TimelineItem: {
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "comment" | "review" | "review_comment";
+            /** Author */
+            author: string;
+            /** Body */
+            body: string;
+            /** Created At */
+            created_at: string;
+            /** Html Url */
+            html_url: string;
+            /** State */
+            state?: string | null;
+            /** Path */
+            path?: string | null;
+            /** Line */
+            line?: number | null;
+        };
         /** Tree */
         Tree: {
-            /** Sha */
-            sha: string;
+            /** Commit Sha */
+            commit_sha: string;
             /** Truncated */
             truncated: boolean;
             /** Entries */
@@ -535,6 +904,74 @@ export interface operations {
             };
         };
     };
+    create_branch_api_repos__owner___name__branches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBranch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Branch"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_branch_api_repos__owner___name__branches_delete: {
+        parameters: {
+            query: {
+                branch: string;
+            };
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_tree_api_repos__owner___name__tree_get: {
         parameters: {
             query: {
@@ -673,6 +1110,354 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Theme"][];
+                };
+            };
+        };
+    };
+    commit_api_repos__owner___name__commits_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommitResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pulls_api_repos__owner___name__pulls_get: {
+        parameters: {
+            query?: {
+                state?: "open" | "closed" | "all";
+                /** @description Branch name in this repo */
+                head?: string | null;
+            };
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PullSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_pull_api_repos__owner___name__pulls_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreatePull"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PullSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_pull_api_repos__owner___name__pulls__number__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Pull"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_pull_files_api_repos__owner___name__pulls__number__files_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PullFile"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    pull_timeline_api_repos__owner___name__pulls__number__timeline_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_comment_api_repos__owner___name__pulls__number__comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewComment"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TimelineItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    merge_pull_api_repos__owner___name__pulls__number__merge_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+                number: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_checks_api_repos__owner___name__checks_get: {
+        parameters: {
+            query: {
+                ref: string;
+            };
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Check"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    check_logs_api_repos__owner___name__checks__job_id__logs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+                name: string;
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

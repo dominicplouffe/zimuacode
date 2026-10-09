@@ -1,3 +1,5 @@
+import json
+
 import respx
 from fastapi.testclient import TestClient
 
@@ -18,10 +20,13 @@ def test_list_repos(authed: TestClient, gh: respx.MockRouter) -> None:
     assert route.calls.last.request.headers["authorization"] == "Bearer ghtok"
 
 
-def test_tree(authed: TestClient, gh: respx.MockRouter) -> None:
-    gh.get("/repos/octo/app/git/trees/feature%2Fx").respond(
+def test_tree_resolves_ref_to_commit(authed: TestClient, gh: respx.MockRouter) -> None:
+    gh.get("/repos/octo/app/commits/feature%2Fx").respond(
+        json={"sha": "c1", "commit": {"tree": {"sha": "t1"}}}
+    )
+    gh.get("/repos/octo/app/git/trees/t1").respond(
         json={
-            "sha": "abc",
+            "sha": "t1",
             "truncated": False,
             "tree": [
                 {"path": "src", "type": "tree"},
@@ -30,7 +35,32 @@ def test_tree(authed: TestClient, gh: respx.MockRouter) -> None:
         }
     )
     tree = authed.get("/api/repos/octo/app/tree", params={"ref": "feature/x"}).json()
+    assert tree["commit_sha"] == "c1"
     assert [e["path"] for e in tree["entries"]] == ["src", "src/main.py"]
+
+
+def test_create_branch(authed: TestClient, gh: respx.MockRouter) -> None:
+    route = gh.post("/repos/octo/app/git/refs").respond(201, json={})
+    resp = authed.post("/api/repos/octo/app/branches", json={"name": "feat/x", "from_sha": "c1"})
+    assert resp.status_code == 201
+    assert json.loads(route.calls.last.request.content) == {
+        "ref": "refs/heads/feat/x",
+        "sha": "c1",
+    }
+
+
+def test_delete_branch(authed: TestClient, gh: respx.MockRouter) -> None:
+    gh.get("/repos/octo/app").respond(json=REPO)
+    route = gh.delete("/repos/octo/app/git/refs/heads/feat/x").respond(204)
+    resp = authed.delete("/api/repos/octo/app/branches", params={"branch": "feat/x"})
+    assert resp.status_code == 204
+    assert route.called
+
+
+def test_refuses_to_delete_default_branch(authed: TestClient, gh: respx.MockRouter) -> None:
+    gh.get("/repos/octo/app").respond(json=REPO)
+    resp = authed.delete("/api/repos/octo/app/branches", params={"branch": "main"})
+    assert resp.status_code == 409
 
 
 def test_file_text_and_binary(authed: TestClient, gh: respx.MockRouter) -> None:

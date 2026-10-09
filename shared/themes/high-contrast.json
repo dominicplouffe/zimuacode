@@ -36,7 +36,19 @@
     "quickInput.background": "#000000",
     "descriptionForeground": "#d0d0d0",
     "errorForeground": "#f48771",
-    "widget.shadow": "#00000000"
+    "widget.shadow": "#00000000",
+    "gitDecoration.modifiedResourceForeground": "#e2c08d",
+    "gitDecoration.addedResourceForeground": "#a1e3ad",
+    "gitDecoration.deletedResourceForeground": "#c74e39",
+    "testing.iconPassed": "#73c991",
+    "testing.iconFailed": "#f14c4c",
+    "testing.iconQueued": "#cca700",
+    "badge.background": "#000000",
+    "badge.foreground": "#ffffff",
+    "button.secondaryBackground": "#000000",
+    "button.secondaryForeground": "#ffffff",
+    "textLink.foreground": "#21a6ff",
+    "textCodeBlock.background": "#000000"
   },
   "tokenColors": [
     {
