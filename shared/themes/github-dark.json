@@ -1,0 +1,142 @@
+{
+  "name": "GitHub Dark",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#0d1117",
+    "editor.foreground": "#e6edf3",
+    "editor.lineHighlightBackground": "#161b22",
+    "editor.selectionBackground": "#264f78",
+    "editorCursor.foreground": "#2f81f7",
+    "editorLineNumber.foreground": "#6e7681",
+    "activityBar.background": "#010409",
+    "activityBar.foreground": "#e6edf3",
+    "activityBar.inactiveForeground": "#7d8590",
+    "sideBar.background": "#010409",
+    "sideBar.foreground": "#e6edf3",
+    "sideBarSectionHeader.background": "#0d1117",
+    "tab.activeBackground": "#0d1117",
+    "tab.inactiveBackground": "#010409",
+    "tab.activeForeground": "#e6edf3",
+    "tab.inactiveForeground": "#7d8590",
+    "tab.border": "#30363d",
+    "statusBar.background": "#0d1117",
+    "statusBar.foreground": "#7d8590",
+    "panel.background": "#010409",
+    "panel.border": "#30363d",
+    "focusBorder": "#1f6feb",
+    "list.hoverBackground": "#161b22",
+    "list.activeSelectionBackground": "#1f6feb",
+    "list.activeSelectionForeground": "#ffffff",
+    "input.background": "#0d1117",
+    "input.foreground": "#e6edf3",
+    "input.border": "#30363d",
+    "button.background": "#238636",
+    "button.foreground": "#ffffff",
+    "button.hoverBackground": "#2ea043",
+    "quickInput.background": "#161b22",
+    "descriptionForeground": "#7d8590",
+    "errorForeground": "#f85149",
+    "widget.shadow": "#010409cc",
+    "gitDecoration.modifiedResourceForeground": "#d29922",
+    "gitDecoration.addedResourceForeground": "#3fb950",
+    "gitDecoration.deletedResourceForeground": "#f85149",
+    "testing.iconPassed": "#3fb950",
+    "testing.iconFailed": "#f85149",
+    "testing.iconQueued": "#d29922",
+    "badge.background": "#1f6feb",
+    "badge.foreground": "#ffffff",
+    "button.secondaryBackground": "#21262d",
+    "button.secondaryForeground": "#e6edf3",
+    "textLink.foreground": "#2f81f7",
+    "textCodeBlock.background": "#161b22"
+  },
+  "tokenColors": [
+    {
+      "scope": [
+        "comment",
+        "punctuation.definition.comment"
+      ],
+      "settings": {
+        "foreground": "#8b949e",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": [
+        "keyword",
+        "storage",
+        "storage.type",
+        "keyword.control"
+      ],
+      "settings": {
+        "foreground": "#ff7b72"
+      }
+    },
+    {
+      "scope": [
+        "string",
+        "string.quoted"
+      ],
+      "settings": {
+        "foreground": "#a5d6ff"
+      }
+    },
+    {
+      "scope": [
+        "constant.numeric",
+        "constant.language",
+        "number"
+      ],
+      "settings": {
+        "foreground": "#79c0ff"
+      }
+    },
+    {
+      "scope": [
+        "entity.name.function",
+        "support.function"
+      ],
+      "settings": {
+        "foreground": "#d2a8ff"
+      }
+    },
+    {
+      "scope": [
+        "entity.name.type",
+        "entity.name.class",
+        "support.class",
+        "type"
+      ],
+      "settings": {
+        "foreground": "#ffa657"
+      }
+    },
+    {
+      "scope": [
+        "variable",
+        "identifier"
+      ],
+      "settings": {
+        "foreground": "#e6edf3"
+      }
+    },
+    {
+      "scope": [
+        "entity.name.tag",
+        "tag"
+      ],
+      "settings": {
+        "foreground": "#7ee787"
+      }
+    },
+    {
+      "scope": [
+        "entity.other.attribute-name",
+        "attribute.name"
+      ],
+      "settings": {
+        "foreground": "#79c0ff"
+      }
+    }
+  ]
+}

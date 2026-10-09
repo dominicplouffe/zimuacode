@@ -28,5 +28,23 @@ def test_rejects_invalid(authed: TestClient) -> None:
 
 def test_themes(authed: TestClient) -> None:
     themes = {t["id"]: t for t in authed.get("/api/themes").json()}
-    assert {"dark", "light", "high-contrast"} <= themes.keys()
+    assert {
+        "dark",
+        "light",
+        "high-contrast",
+        "solarized-dark",
+        "solarized-light",
+        "monokai",
+        "github-dark",
+        "nord",
+    } <= themes.keys()
     assert themes["light"]["colors"]["editor.background"] == "#ffffff"
+    assert themes["solarized-light"]["type"] == "light"
+
+
+def test_themes_define_the_same_keys(authed: TestClient) -> None:
+    themes = authed.get("/api/themes").json()
+    reference = next(t for t in themes if t["id"] == "dark")
+    for theme in themes:
+        assert theme["colors"].keys() == reference["colors"].keys(), theme["id"]
+        assert len(theme["tokenColors"]) == len(reference["tokenColors"]), theme["id"]

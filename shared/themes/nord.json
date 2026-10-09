@@ -1,0 +1,142 @@
+{
+  "name": "Nord",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#2e3440",
+    "editor.foreground": "#d8dee9",
+    "editor.lineHighlightBackground": "#3b4252",
+    "editor.selectionBackground": "#434c5e",
+    "editorCursor.foreground": "#d8dee9",
+    "editorLineNumber.foreground": "#616e88",
+    "activityBar.background": "#2e3440",
+    "activityBar.foreground": "#d8dee9",
+    "activityBar.inactiveForeground": "#7b88a1",
+    "sideBar.background": "#2e3440",
+    "sideBar.foreground": "#d8dee9",
+    "sideBarSectionHeader.background": "#3b4252",
+    "tab.activeBackground": "#2e3440",
+    "tab.inactiveBackground": "#2e3440",
+    "tab.activeForeground": "#eceff4",
+    "tab.inactiveForeground": "#a3adc2",
+    "tab.border": "#3b4252",
+    "statusBar.background": "#3b4252",
+    "statusBar.foreground": "#d8dee9",
+    "panel.background": "#2e3440",
+    "panel.border": "#3b4252",
+    "focusBorder": "#88c0d0",
+    "list.hoverBackground": "#3b4252",
+    "list.activeSelectionBackground": "#434c5e",
+    "list.activeSelectionForeground": "#eceff4",
+    "input.background": "#3b4252",
+    "input.foreground": "#d8dee9",
+    "input.border": "#4c566a",
+    "button.background": "#4a6a94",
+    "button.foreground": "#eceff4",
+    "button.hoverBackground": "#5e81ac",
+    "quickInput.background": "#2e3440",
+    "descriptionForeground": "#a3adc2",
+    "errorForeground": "#bf616a",
+    "widget.shadow": "#00000060",
+    "gitDecoration.modifiedResourceForeground": "#ebcb8b",
+    "gitDecoration.addedResourceForeground": "#a3be8c",
+    "gitDecoration.deletedResourceForeground": "#bf616a",
+    "testing.iconPassed": "#a3be8c",
+    "testing.iconFailed": "#bf616a",
+    "testing.iconQueued": "#ebcb8b",
+    "badge.background": "#4a6a94",
+    "badge.foreground": "#eceff4",
+    "button.secondaryBackground": "#434c5e",
+    "button.secondaryForeground": "#eceff4",
+    "textLink.foreground": "#88c0d0",
+    "textCodeBlock.background": "#3b4252"
+  },
+  "tokenColors": [
+    {
+      "scope": [
+        "comment",
+        "punctuation.definition.comment"
+      ],
+      "settings": {
+        "foreground": "#616e88",
+        "fontStyle": "italic"
+      }
+    },
+    {
+      "scope": [
+        "keyword",
+        "storage",
+        "storage.type",
+        "keyword.control"
+      ],
+      "settings": {
+        "foreground": "#81a1c1"
+      }
+    },
+    {
+      "scope": [
+        "string",
+        "string.quoted"
+      ],
+      "settings": {
+        "foreground": "#a3be8c"
+      }
+    },
+    {
+      "scope": [
+        "constant.numeric",
+        "constant.language",
+        "number"
+      ],
+      "settings": {
+        "foreground": "#b48ead"
+      }
+    },
+    {
+      "scope": [
+        "entity.name.function",
+        "support.function"
+      ],
+      "settings": {
+        "foreground": "#88c0d0"
+      }
+    },
+    {
+      "scope": [
+        "entity.name.type",
+        "entity.name.class",
+        "support.class",
+        "type"
+      ],
+      "settings": {
+        "foreground": "#8fbcbb"
+      }
+    },
+    {
+      "scope": [
+        "variable",
+        "identifier"
+      ],
+      "settings": {
+        "foreground": "#d8dee9"
+      }
+    },
+    {
+      "scope": [
+        "entity.name.tag",
+        "tag"
+      ],
+      "settings": {
+        "foreground": "#81a1c1"
+      }
+    },
+    {
+      "scope": [
+        "entity.other.attribute-name",
+        "attribute.name"
+      ],
+      "settings": {
+        "foreground": "#8fbcbb"
+      }
+    }
+  ]
+}
