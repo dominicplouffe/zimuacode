@@ -165,8 +165,7 @@ function Composer({ task }: { task: TaskSummary }) {
   const send = async () => {
     setError(null)
     try {
-      const sent = await api.sendMessage(task.id, draft.trim(), pasted.images.map((i) => i.data))
-      console.log('[task-debug] sendMessage returned status =', sent.status)
+      await api.sendMessage(task.id, draft.trim(), pasted.images.map((i) => i.data))
       setDraft('')
       pasted.clear()
       queryClient.invalidateQueries({ queryKey: ['task', task.id] })
@@ -428,7 +427,6 @@ export function TaskView({ taskId }: { taskId: string }) {
   if (task.isLoading) return <div className="editor-message">Loading task…</div>
   if (task.error) return <div className="editor-message error">{task.error.message}</div>
   const t = task.data!
-  console.log('[task-debug] render status =', t.status, 'fetching =', task.isFetching, 'updatedAt =', new Date(task.dataUpdatedAt).toISOString())
 
   return (
     <div className="task-view">

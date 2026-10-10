@@ -16,6 +16,20 @@ import { EditorArea } from './EditorArea'
 import { StatusBar } from './StatusBar'
 import { Toast } from './Toast'
 
+/** workbench.fontSize and workbench.fontFamily: the IDE's own text (not the editor's). */
+function useUiFont() {
+  const settings = useEffectiveSettings()
+  const size = settings?.['workbench.fontSize'] as number | undefined
+  const family = settings?.['workbench.fontFamily'] as string | undefined
+  useEffect(() => {
+    const root = document.documentElement.style
+    if (size) root.setProperty('--ui-font-size', `${size}px`)
+    else root.removeProperty('--ui-font-size')
+    if (family) root.setProperty('--font-ui', family)
+    else root.removeProperty('--font-ui')
+  }, [size, family])
+}
+
 function useTheme(): string {
   const settings = useEffectiveSettings()
   const themes = useThemes()
@@ -108,6 +122,7 @@ export function Workbench() {
   const sidebar = useWorkbench((s) => s.sidebar)
   const terminalTask = useWorkbench((s) => s.terminalTask)
   const monacoTheme = useTheme()
+  useUiFont()
   useKeybindings()
   useHashLinks()
 

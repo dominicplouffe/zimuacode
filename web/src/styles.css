@@ -2,6 +2,9 @@
    The fallbacks are the dark theme, used for the moment before themes load. */
 :root {
   --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* workbench.fontSize. Sizes in this file are rem, so the whole UI scales with it. */
+  --ui-font-size: 13px;
+  font-size: var(--ui-font-size);
   color-scheme: dark;
 }
 :root[data-theme-type='light'] {
@@ -20,7 +23,7 @@ body,
 }
 
 body {
-  font: 13px var(--font-ui);
+  font: 1rem var(--font-ui);
   background: var(--editor-background, #1e1e1e);
   color: var(--sideBar-foreground, #cccccc);
   overflow: hidden;
@@ -125,7 +128,7 @@ button {
 
 .sidebar-section-header {
   padding: 6px 12px;
-  font-size: 11px;
+  font-size: 0.846rem;
   font-weight: 700;
   text-transform: uppercase;
   background: var(--sideBarSectionHeader-background, #1f1f1f);
@@ -146,7 +149,7 @@ button {
 .tree-row {
   display: flex;
   align-items: center;
-  height: 22px;
+  height: 1.692rem;
   padding-right: 8px;
   cursor: pointer;
   white-space: nowrap;
@@ -163,7 +166,7 @@ button {
   width: 16px;
   flex-shrink: 0;
   text-align: center;
-  font-size: 10px;
+  font-size: 0.769rem;
 }
 
 .tree-name {
@@ -192,7 +195,7 @@ button {
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 35px;
+  height: 2.692rem;
   padding: 0 6px 0 12px;
   border-right: 1px solid var(--tab-border, #2b2b2b);
   color: var(--tab-inactiveForeground, #9d9d9d);
@@ -205,8 +208,8 @@ button {
 }
 
 .tab-close {
-  width: 20px;
-  height: 20px;
+  width: 1.538rem;
+  height: 1.538rem;
   border: none;
   border-radius: 3px;
   background: none;
@@ -258,7 +261,7 @@ button {
 }
 .welcome h1 {
   font-weight: 400;
-  font-size: 28px;
+  font-size: 2.154rem;
   color: var(--editor-foreground, #d4d4d4);
 }
 .welcome dl {
@@ -279,12 +282,12 @@ button {
 .status-bar {
   display: flex;
   align-items: center;
-  height: 22px;
+  height: 1.692rem;
   flex-shrink: 0;
   padding: 0 4px;
   background: var(--statusBar-background, #007acc);
   color: var(--statusBar-foreground, #fff);
-  font-size: 12px;
+  font-size: 0.923rem;
 }
 
 .status-item {
@@ -292,7 +295,7 @@ button {
   height: 100%;
   border: none;
   background: none;
-  line-height: 22px;
+  line-height: 1.692rem;
   white-space: nowrap;
 }
 button.status-item {
@@ -470,7 +473,7 @@ button.status-item:hover {
   border-radius: 3px;
 }
 .header-action {
-  font-size: 16px;
+  font-size: 1.231rem;
   line-height: 1;
 }
 .header-action:hover,
@@ -507,7 +510,7 @@ button.status-item:hover {
   width: 14px;
   margin-left: 6px;
   text-align: center;
-  font-size: 11px;
+  font-size: 0.846rem;
 }
 .tree-row .change-badge {
   margin-left: auto;
@@ -528,7 +531,7 @@ button.status-item:hover {
   border-radius: 8px;
   background: var(--button-background, #0078d4);
   color: var(--button-foreground, #fff);
-  font-size: 10px;
+  font-size: 0.769rem;
   line-height: 16px;
 }
 
@@ -543,7 +546,7 @@ button.status-item:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 22px;
+  min-height: 1.692rem;
   padding: 2px 8px 2px 12px;
   cursor: pointer;
 }
@@ -560,7 +563,7 @@ button.status-item:hover {
 }
 .list-detail {
   color: var(--descriptionForeground, #9d9d9d);
-  font-size: 12px;
+  font-size: 0.923rem;
 }
 .pr-row .list-main {
   display: flex;
@@ -617,12 +620,12 @@ button.status-item:hover {
 }
 .pr-view h1 {
   margin: 0 0 8px;
-  font-size: 22px;
+  font-size: 1.692rem;
   font-weight: 500;
 }
 .pr-view h2 {
   margin: 0 0 8px;
-  font-size: 14px;
+  font-size: 1.077rem;
   font-weight: 600;
 }
 .pr-meta {
@@ -677,7 +680,7 @@ button.status-item:hover {
 
 .diffstat {
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 0.923rem;
 }
 .diffstat .plus {
   color: var(--gitDecoration-addedResourceForeground, #81b88b);
@@ -763,7 +766,7 @@ button.status-item:hover {
 }
 
 .tab-dirty {
-  font-size: 10px;
+  font-size: 0.769rem;
 }
 
 /* Status bar CI dot and toast */
@@ -828,7 +831,7 @@ button.status-item:hover {
 .task-status {
   padding: 2px 10px;
   border-radius: 12px;
-  font-size: 12px;
+  font-size: 0.923rem;
   font-weight: 600;
   color: #fff;
   background: #6e7681;
@@ -861,7 +864,7 @@ button.status-item:hover {
 }
 .task-header h1 {
   margin: 0 0 6px;
-  font-size: 18px;
+  font-size: 1.385rem;
   font-weight: 500;
 }
 .transcript {
@@ -919,7 +922,7 @@ button.status-item:hover {
   word-break: break-word;
 }
 .msg-note {
-  font-size: 11px;
+  font-size: 0.846rem;
   opacity: 0.8;
 }
 .msg-thinking,
@@ -933,7 +936,7 @@ button.status-item:hover {
   padding: 4px 8px;
   border-left: 2px solid var(--panel-border, #3c3c3c);
   font-family: ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 0.923rem;
 }
 .msg-tool.is-error {
   border-left-color: var(--testing-iconFailed, #f14c4c);
@@ -964,7 +967,7 @@ button.status-item:hover {
 }
 .msg-status {
   margin: 10px 0;
-  font-size: 12px;
+  font-size: 0.923rem;
   text-align: center;
   color: var(--descriptionForeground, #9d9d9d);
 }
@@ -984,7 +987,7 @@ button.status-item:hover {
   padding: 0 6px;
   border-radius: 8px;
   border: 1px solid var(--descriptionForeground, #9d9d9d);
-  font-size: 11px;
+  font-size: 0.846rem;
 }
 
 /* Bottom panel (terminal) */
@@ -1001,7 +1004,7 @@ button.status-item:hover {
   align-items: center;
   justify-content: space-between;
   padding: 4px 12px;
-  font-size: 11px;
+  font-size: 0.846rem;
   text-transform: uppercase;
 }
 .panel-actions {
@@ -1085,7 +1088,7 @@ button.status-item:hover {
   align-items: center;
   gap: 12px;
   margin: 18px 0;
-  font-size: 12px;
+  font-size: 0.923rem;
   color: var(--descriptionForeground, #9d9d9d);
 }
 .msg-round::before,
