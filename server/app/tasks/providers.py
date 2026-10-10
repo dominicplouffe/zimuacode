@@ -135,13 +135,44 @@ def write_login_file(home: Path, relative: str, content: str) -> None:
     marker.write_text(digest)
 
 
-def ide_rules(branch: str) -> str:
-    return (
-        "You are running inside Zimua Code, a web IDE, in a workspace checked out on branch "
-        f"`{branch}`. The user reviews your changes in the IDE and pushes and opens pull "
-        "requests from there, so do not run `git push` or create pull requests yourself. "
-        "You may commit if it helps, but it isn't required."
+def ide_rules(task: Any) -> str:
+    """Standing instructions for the agent: where it runs and how its work reaches GitHub.
+
+    Agents have no GitHub credentials; the IDE publishes for them. Without saying so plainly
+    (and naming the button), agents tell users a pull request "can't be created".
+    """
+    branch = (
+        f"`{task.branch}`"
+        if getattr(task, "branch_named", True)
+        else "a new local branch (it's named after the pull request title when published)"
     )
+    lines = [
+        f"You are running inside Zimua Code, a web IDE, in a workspace on {branch}.",
+        "You can't push or open pull requests yourself: you have no GitHub credentials, and "
+        "the IDE publishes your work. Don't run `git push` or `gh pr create`. You may commit "
+        "if it helps, but it isn't required.",
+    ]
+    previous = list(getattr(task, "previous_prs", None) or [])
+    pr = getattr(task, "pr_number", None)
+    if pr:
+        lines.append(
+            f"This task's open pull request is #{pr}. When the user wants your "
+            "latest changes on it, tell them to click **Push changes to PR** in this task's "
+            "Pull request panel (on the right)."
+        )
+    else:
+        lines.append(
+            "When the user wants a pull request, tell them to type a title in this task's "
+            "Pull request panel (on the right) and click **Create pull request**."
+        )
+    if previous:
+        numbers = ", ".join(f"#{n}" for n in previous)
+        lines.append(
+            f"Earlier pull requests from this task ({numbers}) were merged or closed. "
+            "Publishing opens a new pull request on a fresh branch, so a new pull request is "
+            "always possible; never tell the user it can't be created."
+        )
+    return " ".join(lines)
 
 
 def _tool_result_text(content: Any) -> str:
@@ -271,7 +302,7 @@ class ClaudeCode:
             "--verbose",
             # The sandbox is the safety boundary; there is nobody to approve prompts.
             "--dangerously-skip-permissions",
-            "--append-system-prompt", ide_rules(task.branch),
+            "--append-system-prompt", ide_rules(task),
         ]  # fmt: skip
         if task.model:
             argv += ["--model", task.model]
@@ -451,7 +482,7 @@ class Codex:
             paths = "\n".join(f"../attachments/{path.name}" for path in ctx.images)
             text = f"{text}\n\nImages attached to this message (view them):\n{paths}"
         if ctx.first_turn:
-            return f"{ide_rules(ctx.task.branch)}\n\n{text}"
+            return f"{ide_rules(ctx.task)}\n\n{text}"
         return text
 
     def env(self, ctx: TurnContext) -> dict[str, str]:

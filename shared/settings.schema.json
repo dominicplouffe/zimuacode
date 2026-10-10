@@ -9,6 +9,18 @@
       "default": "dark",
       "description": "Color theme id. Built in: dark, light, high-contrast, solarized-dark, solarized-light, monokai, github-dark, nord. Add more by dropping a VS Code theme JSON into shared/themes/."
     },
+    "workbench.fontSize": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 24,
+      "default": 13,
+      "description": "Font size of the IDE itself (sidebars, tabs, panels, chat), in pixels. Everything scales with it. The editor has its own: editor.fontSize."
+    },
+    "workbench.fontFamily": {
+      "type": "string",
+      "default": "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+      "description": "Font of the IDE itself. The editor and terminal use editor.fontFamily."
+    },
     "editor.fontSize": {
       "type": "integer",
       "minimum": 8,

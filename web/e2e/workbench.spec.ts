@@ -102,3 +102,26 @@ test('edits settings.json with validation', async ({ page }) => {
   const settings = await (await page.request.get('/api/settings')).json()
   expect(settings.effective['editor.fontSize']).toBe(18)
 })
+
+test('workbench.fontSize and fontFamily scale the whole UI', async ({ page }) => {
+  await signIn(page)
+  const save = (raw: string) => page.request.put('/api/settings', { data: { raw }, headers: { 'x-zimua': '1' } })
+  try {
+    await openShopRepo(page)
+    const row = page.getByRole('tree', { name: 'Files' }).getByRole('treeitem').first()
+    const before = (await row.boundingBox())!.height
+    expect(await page.locator('body').evaluate((b) => getComputedStyle(b).fontSize)).toBe('13px')
+
+    expect((await save('{"workbench.fontSize": 18, "workbench.fontFamily": "Georgia, serif"}')).ok()).toBeTruthy()
+    await page.reload()
+    await expect(page.locator('body')).toHaveCSS('font-size', '18px')
+    await expect(page.locator('body')).toHaveCSS('font-family', 'Georgia, serif')
+    const after = (await row.boundingBox())!.height
+    // Rows, tabs and the status bar grow with the text instead of clipping it.
+    expect(after / before).toBeCloseTo(18 / 13, 1)
+    const statusSize = await page.locator('.status-bar').evaluate((el) => parseFloat(getComputedStyle(el).fontSize))
+    expect(statusSize).toBeCloseTo((18 * 12) / 13, 1)
+  } finally {
+    await save('{}')
+  }
+})

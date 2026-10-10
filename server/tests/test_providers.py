@@ -210,3 +210,45 @@ def test_codex_cloud_needs_an_environment(app_client: TestClient) -> None:
         e["data"]["text"] for e in events(app_client, task_id) if e["type"] == "assistant_text"
     ]
     assert "ai.codexCloudEnvironment" in texts[0]
+
+
+def test_ide_rules_say_how_pull_requests_happen() -> None:
+    from types import SimpleNamespace
+
+    from app.tasks.providers import ide_rules
+
+    fresh = ide_rules(
+        SimpleNamespace(
+            branch="zimua/task-abc", branch_named=False, pr_number=None, previous_prs=[]
+        )
+    )
+    assert "named after the pull request title" in fresh
+    assert "zimua/task-abc" not in fresh
+    assert "**Create pull request**" in fresh
+    assert "no GitHub credentials" in fresh
+
+    open_pr = ide_rules(
+        SimpleNamespace(branch="zimua/notes", branch_named=True, pr_number=12, previous_prs=[])
+    )
+    assert "`zimua/notes`" in open_pr
+    assert "open pull request is #12" in open_pr
+    assert "**Push changes to PR**" in open_pr
+
+    after_merge = ide_rules(
+        SimpleNamespace(
+            branch="zimua/task-abc-r2", branch_named=False, pr_number=None, previous_prs=[12, 15]
+        )
+    )
+    assert "(#12, #15) were merged or closed" in after_merge
+    assert "never tell the user it can't be created" in after_merge
+    assert "**Create pull request**" in after_merge
+
+
+def test_both_agents_get_the_rules(tmp_path: Path) -> None:
+    from app.tasks.providers import ClaudeCode
+
+    argv = ClaudeCode().command(ctx(tmp_path, False))
+    rules = argv[argv.index("--append-system-prompt") + 1]
+    assert "Pull request panel" in rules
+    assert "Pull request panel" in Codex().prompt(ctx(tmp_path, True), "do it")
+    assert Codex().prompt(ctx(tmp_path, False), "more") == "more"

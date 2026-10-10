@@ -131,6 +131,8 @@ Open them with **⌘,** (Ctrl+, on Windows and Linux), the gear icon, or "Prefer
 | Key | Default |
 | --- | --- |
 | `workbench.theme` | `"dark"` (also `light`, `high-contrast`, `solarized-dark`, `solarized-light`, `monokai`, `github-dark`, `nord`) |
+| `workbench.fontSize` | `13` (the IDE's own text; everything scales with it) |
+| `workbench.fontFamily` | system UI font |
 | `editor.fontSize` | `14` |
 | `editor.fontFamily` | system monospace |
 | `editor.tabSize` | `4` |
